@@ -57,3 +57,6 @@ vignettes/*.pdf
 
 #Ignore DS_Store!
 .DS_Store
+
+#Keep figs folder but ignore the interactive_map_files sub-folder
+/figs/interactive_map_files
