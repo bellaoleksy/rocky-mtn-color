@@ -1,0 +1,280 @@
+---
+title: "2009-2020 lake colors and controls"
+author: "Matthew Ross"
+date: "01/12/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(leaflet)
+library(sf)
+library(feather)
+library(lubridate)
+library(mapview)
+library(USAboundaries)
+library(s2)
+library(elevatr)
+library(trend)
+library(tsibble)
+library(imputeTS)
+library(ggthemes)
+library(nhdplusTools)
+library(tmap)
+library(raster)
+library(caret)
+library(rpart)
+library(yardstick)
+library(rpart.plot)
+
+
+sf_use_s2(use_s2 = T)
+knitr::opts_chunk$set(echo = TRUE, warning = F, comment = F, message = F)
+```
+
+
+# Where blue green lakes are
+
+## BELLA MAKE DECISIONS HERE
+
+### Super join to all things w/ Median DWL 2009-2020
+
+```{r}
+
+
+dwl_medians <- co_summary_median %>%
+  filter(var == 'dWL',
+         stat == 'median') %>%
+  select(-var,-stat) %>%
+  rename(dWL = value)
+
+
+#From recent decade to match map
+blue_green_2018 <- glcp_high_lakes %>%
+  filter(year >= 2009) %>%
+  inner_join(dwl_medians) %>%
+  group_by(Hylak_id) %>%
+  summarize(across(where(is.numeric),median, na.rm = T)) %>%
+  mutate(group = cut(dWL, 
+                     breaks = c(0,530,Inf), 
+                     labels = c('Blue/clear',
+                                          'Green/murky'))) %>%
+  dplyr::filter(!is.na(dWL)) %>%
+  inner_join(lake_descriptor) %>%
+  mutate(air_temp = mean_annual_temp_k - 273.15) %>%
+  # LakeCAT and GLCP predictors, maybe add in land use when fixed
+  dplyr::select(precip = mean_monthly_precip_mm,
+                air_temp,
+                res = lake_rsvr_class,
+                area = areasqkm,
+                elev = elevation,
+                meandepth,
+                pop_sum,
+                maxdepth,
+                ws_area = WsAreaSqKm,
+                no3 = NO3_2018Ws,
+                carb = PctCarbResidWs,
+                sil = PctSilicicWs,
+                dWL,
+                Hylak_id,
+                group) %>%
+  na.omit(.) #Everything has to be complete data. 
+
+
+
+
+
+
+
+
+```
+
+
+## Figures
+
+
+### Site Map w/ Forel-Ule Color
+
+```{r}
+
+
+site_cols <- blue_green_2018 %>%
+  mutate(dWL = round(dWL,0)) %>%
+  inner_join(fui.lookup) %>%
+  inner_join(fui.colors) %>%
+  inner_join(lake_descriptor %>%
+               dplyr::select(Hylak_id),.)
+
+
+
+
+buffer_box <- st_bbox(site_cols) %>%
+  st_as_sfc(.) %>%
+  st_buffer(50000) %>%
+  st_bbox()
+
+
+
+ras <- get_elev_raster(site_cols, z = 5) %>%
+  raster::crop(.,buffer_box)
+
+ras[ras < 0] <- 0
+slope <- terrain(ras, 'slope')
+aspect <- terrain(ras, 'aspect')
+
+hil <- hillShade(slope, aspect)
+
+states <- USAboundaries::us_states()
+
+
+png(filename = 'figs/bg_better_map.png',
+    width = 4, height = 6, units = 'in', res = 300)
+
+tm_shape(hil) +
+  tm_raster(palette = gray(0:10 / 10),
+            style = "cont", legend.show = FALSE) + 
+tm_shape(ras) + 
+  tm_raster(alpha = 0.4,
+            style = 'cont',
+            title = 'Elevation (m)',
+            palette = 'Greys') + 
+tm_shape(states) + 
+  tm_borders(lwd = 1,
+             col = 'black') + 
+  tm_shape(site_cols) + 
+  tm_bubbles(size = .2,
+             col = 'color',
+             border.col = 'black',
+             border.lwd = 1,
+             jitter = .3) + 
+  tm_legend(legend.position = c(0.1,0),
+            legend.bg.color = 'gray90') 
+
+dev.off()
+
+
+```
+
+
+### Blue Green Category Only Map
+
+```{r}
+
+
+
+png(filename = 'figs/bg_map.png',
+    width = 5, height = 8, units = 'in', res = 300)
+
+tm_shape(hil) +
+  tm_raster(palette = gray(0:10 / 10),
+            style = "cont", legend.show = FALSE) + 
+tm_shape(ras) + 
+  tm_raster(alpha = 0.4,
+            style = 'cont',
+            title = 'Elevation (m)',
+            palette = 'Greys') + 
+tm_shape(states) + 
+  tm_borders(lwd = 1,
+             col = 'black') + 
+  tm_shape(site_cols) + 
+  tm_bubbles(size = .2,
+             col = 'group',
+             border.col = 'black',
+             border.lwd = 1,
+             jitter = .3,
+             palette = c('deepskyblue2','darkolivegreen3')) + 
+  tm_legend(legend.position = c(0.1,0),
+            legend.bg.color = 'gray90') 
+
+dev.off()
+
+
+```
+
+### Interactive BG map
+
+```{r, eval = F}
+
+
+# str(site_cols)
+# mapviewOptions(fgb = F)
+m1 <- mapview(site_cols, zcol = 'color', col.regions = site_cols$color,
+              legend = F)
+
+mapshot(m1, url = 'lake_color_decade.html')
+
+```
+
+
+### Why blue, why green?
+
+
+```{r}
+
+
+
+set.seed(4444)
+
+train_d <- blue_green_2018 %>%
+  sample_frac(0.8)
+
+test_d <- blue_green_2018 %>%
+  dplyr::filter(!Hylak_id %in% train_d$Hylak_id) %>%
+  dplyr::select(-Hylak_id,-dWL) 
+
+train_d <- train_d %>%
+    dplyr::select(-Hylak_id,-dWL) 
+
+
+
+## Not run, but code that helped make decision about complexity parameter
+# prune_mod <-caret::train(
+#   group ~., data = train_d, method = "rpart",
+#   trControl = trainControl("boot", number = 100),
+#   tuneLength = 100
+#   )
+
+
+
+cart_mod <- rpart(group ~ ., data = train_d,
+                  method = 'class',
+                  cp = 0.03) # CP is a tuning knob for tree complexity. 
+
+
+
+test_d$guess <- predict(cart_mod, test_d, 'class')
+cm <- conf_mat(test_d, group,guess)
+accuracy(test_d,group,guess)
+
+png(filename = 'figs/bg_tree.png',
+    width = 7, height = 8, units = 'in', res = 300)
+rpart.plot(cart_mod, type = 2,
+           extra = 2, clip.right.labs = F,
+           branch = 0.3,
+           box.palette = list('#1f78b4','#33a02c'))
+
+dev.off()
+
+
+png(filename = 'figs/bg_confusion_matrix.png',
+    width = 6, height = 5,
+    units = 'in', res = 300)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+dev.off()
+
+
+
+
+
+```
+
+
+

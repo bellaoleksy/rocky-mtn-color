@@ -1,0 +1,471 @@
+---
+title: "LimnoSat-US_Tutorial"
+author: "Simon Topp"
+date: "11/2/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(leaflet)
+library(sf)
+library(feather)
+library(lubridate)
+library(mapview)
+library(USAboundaries)
+library(s2)
+library(elevatr)
+library(trend)
+library(tsibble)
+library(imputeTS)
+library(ggthemes)
+library(nhdplusTools)
+library(tmap)
+library(raster)
+library(caret)
+library(rpart)
+library(yardstick)
+library(rpart.plot)
+
+
+sf_use_s2(use_s2 = T)
+knitr::opts_chunk$set(echo = TRUE, warning = F, comment = F, message = F)
+```
+
+
+## Trend Analysis
+
+### Trend Data prep
+
+Lots of key decisions in here. Could iterate
+
+
+```{r, eval = F}
+
+
+
+co_summary <- ls_co %>%
+  dplyr::select(-year, -sat) %>%
+  mutate(month = month(date),
+         year = year(date),
+         doy = yday(date)) %>%
+  filter(month %in% 7:9, 
+         doy <= 258) %>% 
+  group_by(Hylak_id,year) %>%
+  add_count() %>%
+  filter(year > 1984) %>%
+  filter(n >= 3) %>%
+  group_by(Hylak_id) %>%
+  mutate(unique_years = n_distinct(year)) %>%
+  filter(unique_years > 30) %>%
+  arrange(year) %>%
+  #complete years
+  group_by(Hylak_id,year) %>%
+  summarize(across(c(Blue:dWL),
+                   .fns = list(mean = mean, 
+                               sd = sd, 
+                               max = max,
+                               min = min,
+                               median = median), na.rm = T,
+                   .names = "{.col}-{.fn}"))%>% 
+  ungroup() %>%
+  as_tsibble(., key = Hylak_id, index=year) %>%
+  fill_gaps() %>%
+  as_tibble() %>%
+  pivot_longer(cols = `Blue-mean`:`dWL-median`,
+               names_to = c('var','stat'),
+               names_sep = '-') %>%
+  group_by(Hylak_id, var, stat) %>%
+  arrange(year) %>%
+  mutate(impute_value = na_interpolation(value, maxgap = 1))
+
+
+filled_enough <- co_summary %>%
+  group_by(Hylak_id) %>%
+  summarize(any_nas = any(is.na(impute_value))) %>%
+  filter(any_nas == F)
+
+
+co_full <- co_summary %>%
+  filter(Hylak_id %in% filled_enough$Hylak_id) 
+
+
+
+save(co_full, file = 'data/color_summary.RData')
+```
+
+
+
+
+
+## Net Trends in DWL
+
+
+```{r}
+
+load('data/ls_elev.RData')
+load('data/color_summary.RData')
+load('data/nhd_lakes.RData')
+load('glcp_sub.RData')
+
+nhd_hylak <- nhd_hylak %>%
+  filter(elevation > 1000) %>%
+  filter(ftype %in% c('LakePond','Reservoir')) 
+
+actually_high_lakes <- nhd_hylak
+
+high_lakes <- co_full %>%
+  filter(Hylak_id %in% actually_high_lakes$Hylak_id)
+
+map_sens <- function(df){
+  sens.slope(df$impute_value)
+}
+
+
+
+
+sens_est <- function(mod){
+  mod$estimate
+}
+
+val_mean <- function(df){
+  early_mean <- df %>%
+    filter(year < 2005) %>%
+    pull(impute_value) %>%
+    mean(., na.rm = T)
+}
+
+trend_plotter <- function(study_lakes = high_lakes,
+                          v = 'dWL',
+                          x = 'Dominant Wavelength Sens Slope'){
+  
+  
+  trend_plot <- function(df){
+    ggplot(df,aes(x = year,
+                  y = impute_value)) +
+      geom_point() + 
+      stat_smooth(method = 'lm')
+  }
+  
+  
+  co_mods <- study_lakes %>%
+    filter(var == v) %>%
+    group_by(Hylak_id, stat) %>%
+    nest() %>%
+    mutate(sens = map(data, map_sens),
+           plots = map(data, trend_plot),
+           sens_sum = map(sens,broom::glance),
+           slope = map(sens,sens_est),
+           early_mean = map(data, val_mean))
+  
+  
+  sens_sum = unnest(co_mods, c(sens_sum,slope, early_mean)) %>%
+    mutate(Trend = case_when(p.value <= 0.05 & slope >= 0 & early_mean < 530 ~ 'Blue -> Green',
+                             p.value <= 0.05 & slope >= 0 & early_mean > 530 ~ 'Green -> Yellow',
+                             p.value <= 0.05 & slope <= 0 & early_mean > 530 ~ 'Green -> Blue',
+                             p.value <= 0.05 & slope <= 0 & early_mean < 530 ~ 'Blue -> Bluer',
+                             p.value > 0.05 ~ 'No trend'),
+           Trend = factor(Trend, 
+                          levels = c('No trend',
+                                      'Blue -> Bluer',
+                                     'Green -> Blue',
+                                     'Green -> Yellow',
+                                     'Blue -> Green')))
+  
+
+  plot <- ggplot(sens_sum %>%
+                  dplyr::filter(stat != 'sd'),aes(x=slope,color=Trend)) + 
+    geom_freqpoly(bins = 20, size = 1) + 
+    facet_wrap(~stat) +
+    theme_few() + 
+    theme(legend.position = 'top',
+          legend.direction = 'horizontal') +
+    guides(color=guide_legend(nrow=2, byrow=TRUE)) + 
+    scale_color_manual(values = c('gray20','#1f78b4','#a6cee3','#b2df8a','#33a02c'),
+                       name = '') + 
+    xlab(x) + 
+    ylab('Lake count')
+  
+  
+  return(list(sens_sum, plot))
+}
+
+
+
+
+
+```
+
+## DWL modes
+
+### DWL histogram
+
+
+```{r}
+high_lakes_descriptor <- glcp_high_lakes %>%
+  group_by(Hylak_id) %>%
+  summarize(across(where(is.numeric),mean))
+
+
+
+high_modes <- high_lakes %>%
+  filter(var == 'dWL',
+         stat == 'median') %>%
+  dplyr::mutate(decade = cut(year, breaks = c(1984,1996,2008,2021),
+                             labels = c('1985-96','1997-2008','2009-2020'))) %>%
+  group_by(Hylak_id, decade) %>%
+  summarize(dWL = round(median(value, na.rm = T),0)) %>%
+  ungroup() %>%
+  inner_join(fui.lookup) %>%
+  inner_join(fui.colors) 
+
+
+bg.fui = tibble(
+  ymin = c(470,475,480,485,489,495,509,530,549,559,564,567,568,569,570,573,575,577,579,581,583),
+  ymax = c(475,480,485,489,495,509,530,549,559,564,567,568,569,570,573,575,577,579,581,583,590),
+  color = c(
+  "#2158bc", "#316dc5", "#327cbb", "#4b80a0", "#568f96", "#6d9298", "#698c86", 
+  "#759e72", "#7ba654", "#7dae38", "#94b660","#94b660", "#a5bc76", "#aab86d", 
+  "#adb55f", "#a8a965", "#ae9f5c", "#b3a053", "#af8a44", "#a46905", "#9f4d04")
+)
+
+
+# make prettier
+png(filename = 'figs/dwl_hist.png', width = 4, height = 4,
+    units = 'in', res = 300)
+
+
+ggplot() + 
+  facet_wrap(~decade, ncol = 1) + 
+  geom_rect(data = bg.fui, 
+            aes(xmin = ymin, xmax = ymax, ymin = -5, ymax = 100, fill = color)) + 
+  geom_vline(xintercept = 530, linetype = 3) +
+  geom_histogram(data = high_modes, aes(x=dWL, y = ..density..), fill = NA,
+                 color = 'black', alpha = .3, bins = 40) + 
+  geom_density(data = high_modes, aes(x=dWL)) + 
+  scale_fill_identity() + 
+  theme_few() +
+  coord_cartesian(ylim = c(0,.03))  
+
+
+
+dev.off()
+
+
+
+```
+
+
+
+
+
+
+
+```{r}
+ggplot(high_modes, aes(x= mean_monthly_precip_mm, y = dWL,
+                       color = mean_annual_temp_k)) + 
+  geom_point() + 
+  facet_wrap(~decade) + 
+  scale_x_log10()
+
+
+
+```
+
+
+
+
+## DWL Trends
+```{r}
+
+
+dWL_trends <- trend_plotter()
+
+
+png(filename = 'figs/dwl_hist.png', width = 4,
+    height = , units = 'in', res = 300)
+dWL_trends[[2]]
+dev.off()
+
+```
+
+
+## DWL why?
+
+```{r}
+
+
+dwl <- dWL_trends[[1]] %>%
+  inner_join(nhd_hylak, by = 'Hylak_id') 
+
+
+
+dwl_all <- dwl %>%
+  filter(stat == 'median') %>%
+  unnest(data)
+
+
+set.seed(4)
+dwl_specials <- dwl_all %>%
+  filter(p.value < 0.001 | Trend == 'No trend') %>%
+  filter(abs(slope) > 1 | Trend == 'No trend') %>%
+  group_by(Trend) %>%
+  sample_n(1) %>%
+  pull(Hylak_id) 
+
+
+full_spec <- dwl_all %>%
+  filter(Hylak_id %in% dwl_specials)
+
+png(filename = 'figs/Trend Examples.png',
+    width = 6,
+    height = 4,
+    res = 300,
+    units = 'in')
+ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) + 
+  geom_smooth(
+              method = 'lm',
+              se = F,
+              col = 'gray',
+              alpha = 0.1) + 
+  geom_point(data = full_spec, color = 'black') + 
+  geom_smooth(data = full_spec, color = 'blue',
+              method = 'lm',
+              se = F) + 
+  facet_wrap(~Trend) + 
+  theme_few()
+
+dev.off()
+
+
+
+
+dwl_super_exampes <- dwl %>%
+  group_by(Hylak_id, stat,) %>%
+  mutate(lowp = min(p.value),
+         slope = max(p.value))
+
+ggplot(dwl, aes(x = elevation, y = slope, color = ftype)) + 
+  geom_point(shape = 1) + 
+  facet_wrap(~stat,
+             scales = 'free') + 
+      scale_color_hc() 
+
+
+```
+
+
+## DWL map
+
+```{r}
+
+class(definitely_lakes)
+dwl_map <- dwl %>%
+  filter(stat == 'median',
+         Hylak_id %in% nhd_hylak_blue_mod$Hylak_id) %>%
+  dplyr::select(Hylak_id,Trend) %>%
+  inner_join(site_cols,.) %>%
+  arrange(Trend)
+
+
+
+png(filename = 'figs/trend_map.png',
+    width = 4, height = 6, units = 'in', res = 300)
+
+tm_shape(hil) +
+  tm_raster(palette = gray(0:10 / 10), style = "cont", legend.show = FALSE) + 
+tm_shape(ras) + 
+  tm_raster(alpha = 0.4,
+            style = 'cont',
+            title = 'Elevation (m)',
+            palette = 'Greys',
+            legend.show = F) + 
+  tm_shape(dwl_map) + 
+  tm_dots(title = '',size = .2,
+             col = 'Trend',
+          shape = 16,
+          palette = c('gray20','#1f78b4','#a6cee3','#b2df8a','#33a02c')) + 
+  tm_legend(legend.position = c(0.1,0.08))
+
+dev.off()
+
+
+```
+
+## Why DWL
+
+
+```{r}
+
+
+
+```
+
+
+## Nir trends
+
+DWL is a human eye color. So it has no information from the Nir band. Nir can increase with sediment, algae, and other constituents. 
+
+```{r, eval = F}
+nir_trends <- trend_plotter('Nir',
+                            'Trend in Nir reflectance')
+
+png(filename = 'figs/nir_hist.png', width = 6,
+    height = 4, units = 'in', res = 300)
+nir_trends[[2]]
+dev.off()
+
+```
+
+
+
+```{r}
+trend_lakes <- co_lakes %>%
+  inner_join(dWL_trends[[1]] %>% 
+               filter(stat == 'median') %>%
+               select(Hylak_id, Trend, slope,plots)) 
+  
+
+
+plot_list <- as.list(trend_lakes$plots)
+
+library(leafpop)
+m1 <- mapview(trend_lakes,
+        zcol='Trend',
+        popup = leafpop::popupGraph(plot_list))
+
+m1
+mapshot(m1, url = 'interactive_map.html',
+        selfcontained = F)
+
+```
+
+
+
+
+
+```{r}
+ht <- co_summary %>%
+  filter(Hylak_id == '112043') %>%
+  filter(var == 'dWL')
+
+ggplot(ht,aes(x=year,y=value)) + 
+  geom_point() + 
+  facet_wrap(~stat, scales = 'free_y')
+
+str()
+ggplot(trend_lakes,aes(x=elevation,
+                       y = slope)) + 
+  geom_point()
+
+mod <- lm(slope ~ elevation, data = trend_lakes)
+
+summary(mod)
+```
+
+
