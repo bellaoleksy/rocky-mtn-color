@@ -94,6 +94,7 @@ co_lakes <- lakes[co,]  %>%
 ## FUI - Create Forel-Ule Color table
 
 #Connect dWL to the forel ule index for visualization
+#The Forel-Ule Index (FUI) is a useful comprehensive indicator to show the water colour variability and water quality change in both inland waters and oceans.
 fui.lookup <- tibble(dWL = c(471:583), fui = NA)
 fui.lookup$fui[fui.lookup$dWL <= 583] = 21
 fui.lookup$fui[fui.lookup$dWL <= 581] = 20
@@ -253,7 +254,7 @@ save(full_nhd,nhd_hylak, file = 'data/nhd_lakes.RData')
 ```{r}
 
 
-rsrvr <- read_csv('data/LAGOSUS_RSVR_v1.1.csv') %>%
+rsvr <- read_csv('data/LAGOSUS_RSVR_v1.1.csv') %>%
   filter(lake_centroidstate %in% c('CO','UT','WY','MT','NM',
                                    'ID','NV')) %>%
   dplyr::select(lagoslakeid, lake_rsvr_class)
@@ -261,17 +262,13 @@ rsrvr <- read_csv('data/LAGOSUS_RSVR_v1.1.csv') %>%
 lake_link <- read_csv('data/lake_link.csv') %>%
   dplyr::filter(!is.na(nhdplusv2_comid)) %>%
   distinct(lagoslakeid, nhdplusv2_comid, .keep_all = T) %>%
-  filter(lagoslakeid %in% rsrvr$lagoslakeid) %>%
-  inner_join(rsrvr)
+  filter(lagoslakeid %in% rsvr$lagoslakeid) %>%
+  inner_join(rsvr)
 
-
-
-############### BELLA THIS IS STILL FROM THE OLD DATA ###################
-lakeCat <- read_feather('data/lakeCat.feather') %>%
-  # A billion dupes, why? 
-  distinct(nhdplusv2_comid, lagoslakeid,.keep_all = T) %>%
-  select(-lake_nhdid,-lake_lat_decdeg,-lake_lon_decdeg)
-
+lakeCat <- read_feather('data/lakeCatExport.feather') #Updated lakeCat export 2021-03-14 IAO
+#No longer have issues with duplicates
+#Added in WALA (watershed area to lake area);
+#could remove lake_waterarea_ha and lake_totalarea_ha columns if those exist elsewhere
 
 
 ### LInking above through lagos lake_link
@@ -281,27 +278,9 @@ lake_descriptor <- nhd_hylak %>%
   #These are truly identical dupes and I have no clue how they keep sneaking through
   # distinct is dangerous but appropriate here. 
   distinct(Hylak_id,.keep_all = T)
+names(lake_descriptor)
 
-
-
-## OLd code that justifies the above if you remove `distinct(Hylak_id)` you can
-# see why
-#Sneaky dupes
-# descriptor_dupes <- lake_descriptor %>%
-#   as.data.frame() %>%
-#   select(-geometry) %>%
-#   count(Hylak_id) %>%
-#   filter(n > 1)
-# 
-# 
-# #Map dupes
-# sneaky_dupes <- lake_descriptor %>%
-#   filter(Hylak_id %in% descriptor_dupes$Hylak_id) 
-# 
-# View(sneaky_dupes)
-# 
-# View(descriptor_dupes)
-
+save(lake_descriptor, file = 'data/lake_descriptor.RData')
 ```
 
 
