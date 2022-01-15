@@ -55,27 +55,27 @@ co_summary <- ls_co %>%
          year = year(date),
          doy = yday(date)) %>%
   filter(month %in% 7:9, 
-         doy <= 258) %>% 
+         doy <= 258) %>% #Sept 14/15
   group_by(Hylak_id,year) %>%
   add_count() %>%
   filter(year > 1984) %>%
-  filter(n >= 3) %>%
+  filter(n >= 3) %>% # at least 3 observations per year
   group_by(Hylak_id) %>%
   mutate(unique_years = n_distinct(year)) %>%
-  filter(unique_years > 30) %>%
+  filter(unique_years > 30) %>% # at least 30 years of data
   arrange(year) %>%
   #complete years
   group_by(Hylak_id,year) %>%
   summarize(across(c(Blue:dWL),
-                   .fns = list(mean = mean, 
-                               sd = sd, 
+                   .fns = list(mean = mean,
+                               sd = sd,
                                max = max,
                                min = min,
                                median = median), na.rm = T,
-                   .names = "{.col}-{.fn}"))%>% 
+                   .names = "{.col}-{.fn}"))%>%
   ungroup() %>%
-  as_tsibble(., key = Hylak_id, index=year) %>%
-  fill_gaps() %>%
+  as_tsibble(., key = Hylak_id, index=year) %>% #time series tibble
+  fill_gaps() %>% #imputing, though not sure what's going on under the hood
   as_tibble() %>%
   pivot_longer(cols = `Blue-mean`:`dWL-median`,
                names_to = c('var','stat'),
@@ -87,8 +87,8 @@ co_summary <- ls_co %>%
 
 filled_enough <- co_summary %>%
   group_by(Hylak_id) %>%
-  summarize(any_nas = any(is.na(impute_value))) %>%
-  filter(any_nas == F)
+  summarize(any_nas = any(is.na(impute_value))) %>% # check if there are missing values in each Hylak_id timeseries
+  filter(any_nas == F) # only select the sites with a max of 1 year of missing data
 
 
 co_full <- co_summary %>%
@@ -111,10 +111,10 @@ save(co_full, file = 'data/color_summary.RData')
 load('data/ls_elev.RData')
 load('data/color_summary.RData')
 load('data/nhd_lakes.RData')
-load('glcp_sub.RData')
+load('data/glcp_sub.RData')
 
 nhd_hylak <- nhd_hylak %>%
-  filter(elevation > 1000) %>%
+  filter(elevation > 1000) %>% ## IAO -- do we want to change this to 1400 as in 2_GreenBlueMedians.Rmd? 
   filter(ftype %in% c('LakePond','Reservoir')) 
 
 actually_high_lakes <- nhd_hylak
@@ -166,15 +166,15 @@ trend_plotter <- function(study_lakes = high_lakes,
   
   sens_sum = unnest(co_mods, c(sens_sum,slope, early_mean)) %>%
     mutate(Trend = case_when(p.value <= 0.05 & slope >= 0 & early_mean < 530 ~ 'Blue -> Green',
-                             p.value <= 0.05 & slope >= 0 & early_mean > 530 ~ 'Green -> Yellow',
+                             p.value <= 0.05 & slope >= 0 & early_mean > 530 ~ 'Intensifying Green',
                              p.value <= 0.05 & slope <= 0 & early_mean > 530 ~ 'Green -> Blue',
-                             p.value <= 0.05 & slope <= 0 & early_mean < 530 ~ 'Blue -> Bluer',
+                             p.value <= 0.05 & slope <= 0 & early_mean < 530 ~ 'Intensifying Blue',
                              p.value > 0.05 ~ 'No trend'),
            Trend = factor(Trend, 
                           levels = c('No trend',
-                                      'Blue -> Bluer',
+                                      'Intensifying Blue',
                                      'Green -> Blue',
-                                     'Green -> Yellow',
+                                     'Intensifying Green',
                                      'Blue -> Green')))
   
 
@@ -267,6 +267,7 @@ dev.off()
 
 
 ```{r}
+##IAO - not sure what's happening here -- 
 ggplot(high_modes, aes(x= mean_monthly_precip_mm, y = dWL,
                        color = mean_annual_temp_k)) + 
   geom_point() + 
@@ -282,11 +283,9 @@ ggplot(high_modes, aes(x= mean_monthly_precip_mm, y = dWL,
 
 ## DWL Trends
 ```{r}
-
-
 dWL_trends <- trend_plotter()
 
-
+##IAO-- this is cool but I think we will want to only look at median. Or if we want to look at max, maybe filter down to only sites with >3 observations a year?
 png(filename = 'figs/dwl_hist.png', width = 4,
     height = , units = 'in', res = 300)
 dWL_trends[[2]]
@@ -310,53 +309,38 @@ dwl_all <- dwl %>%
   unnest(data)
 
 
-set.seed(4)
+set.seed(111)
 dwl_specials <- dwl_all %>%
-  filter(p.value < 0.001 | Trend == 'No trend') %>%
-  filter(abs(slope) > 1 | Trend == 'No trend') %>%
+  # filter(abs(slope) >= 1 | Trend == 'No trend') %>%
+  # filter(p.value < 0.05 | Trend == 'No trend') %>% # Had to change from 0.001 to 0.05 to get a blue->green example lake
+  filter(abs(slope) >= 1 & p.value < 0.05) %>% #I think it would be better to not show a trend line for "No Trend"
   group_by(Trend) %>%
   sample_n(1) %>%
   pull(Hylak_id) 
-
+# IAO Why are no points coming up for Blue->Bluer and Blue->Green
 
 full_spec <- dwl_all %>%
   filter(Hylak_id %in% dwl_specials)
 
-png(filename = 'figs/Trend Examples.png',
-    width = 6,
-    height = 4,
-    res = 300,
-    units = 'in')
+
+# png(filename = 'figs/Trend Examples.png',
+#     width = 6,
+#     height = 4,
+#     res = 300,
+#     units = 'in')
 ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) + 
-  geom_smooth(
-              method = 'lm',
-              se = F,
+  geom_smooth(method = 'lm',
+              se = FALSE,
               col = 'gray',
               alpha = 0.1) + 
-  geom_point(data = full_spec, color = 'black') + 
-  geom_smooth(data = full_spec, color = 'blue',
+  geom_point(data = full_spec, shape=21, fill = 'white') + 
+  geom_smooth(data = full_spec, color = 'black',
               method = 'lm',
-              se = F) + 
+              se = FALSE) + 
   facet_wrap(~Trend) + 
   theme_few()
-
-dev.off()
-
-
-
-
-dwl_super_exampes <- dwl %>%
-  group_by(Hylak_id, stat,) %>%
-  mutate(lowp = min(p.value),
-         slope = max(p.value))
-
-ggplot(dwl, aes(x = elevation, y = slope, color = ftype)) + 
-  geom_point(shape = 1) + 
-  facet_wrap(~stat,
-             scales = 'free') + 
-      scale_color_hc() 
-
-
+## IAO -- Add sample size to plots 
+# dev.off()
 ```
 
 
