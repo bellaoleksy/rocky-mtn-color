@@ -1,7 +1,7 @@
 ---
 title: "Colorado Mountain Lake Color Trends/Controls"
-author: "Matthew Ross"
-date: "01/12/2022"
+author: "Matthew Ross, Isabella Oleksy"
+date: "Last compiled on `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -35,7 +35,7 @@ This document started out as a tutorial by Simon Topp for working with LimnoSat,
 a dataset of Landsat lake color. To work with this data, we first need to download
 it in the chunk below. 
 
-```{r LimnoSat Download, eval = F}
+```{r, eval = F}
 ## Pull the URLS from the zenodo repo. More information on the contents of these files can be found at
 ## https://doi.org/10.5281/zenodo.4139694.
 ls.urls <- httr::GET("https://zenodo.org/api/records/4139694") 
@@ -184,6 +184,7 @@ co_summary_median <- ls_co %>%
   pivot_longer(cols = `Blue-mean`:`dWL-median`,
                names_to = c('var','stat'),
                names_sep = '-')
+## I copied this code into 2_GreenBlueMedians.Rmd - IAO 
 
 ```
 
@@ -246,13 +247,8 @@ save(full_nhd,nhd_hylak, file = 'data/nhd_lakes.RData')
 
 ### Join to Lagos Res and LakeCAT
 
-- LakeCat data is still corrupted. 
-
-
-# BELLA WORK HERE!
-
 ```{r}
-
+load("data/nhd_lakes.RData")
 
 rsvr <- read_csv('data/LAGOSUS_RSVR_v1.1.csv') %>%
   filter(lake_centroidstate %in% c('CO','UT','WY','MT','NM',
