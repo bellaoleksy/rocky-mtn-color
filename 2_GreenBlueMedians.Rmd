@@ -258,10 +258,12 @@ tm_shape(states) +
              border.lwd = 1,
              jitter = .3,
              palette = c('deepskyblue2','darkolivegreen3')) + 
-  tm_legend(legend.position = c(0.1,0),
-            legend.bg.color = 'gray90') 
+  tm_legend(legend.position = c(0,0),
+            legend.bg.color = 'gray90',
+            legend.frame = 'black') 
 
 dev.off()
+
 
 
 ```
@@ -276,7 +278,7 @@ dev.off()
 m1 <- mapview(site_cols, zcol = 'color', col.regions = site_cols$color,
               legend = F)
 
-mapshot(m1, url = 'lake_color_decade.html')
+mapshot(m1, url = 'figs/lake_color_decade.html')
 
 ```
 
