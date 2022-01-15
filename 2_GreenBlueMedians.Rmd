@@ -352,18 +352,22 @@ dev.off()
 ##Alternative confusion matrix using cvms library, ggplot2 friendly
 conf_mat <- confusion_matrix(targets = test_d$group,
                              predictions = test_d$guess)
+png(filename = 'figs/bg_confusion_matrix_gg.png',
+    width = 6, height = 5,
+    units = 'in', res = 300)
 plot_confusion_matrix(conf_mat,
                       add_counts = TRUE,
                       add_row_percentages = FALSE,
                       add_col_percentages = FALSE,
                       counts_on_top = TRUE,
                       tile_border_color = 'black',
-                      tile_border_linetype = "solid")+
-  ggplot2::scale_fill_distiller(palette = "Greys",direction=1)+
+                      tile_border_linetype = "solid",
+                      darkness=0.7)+
+  ggplot2::scale_fill_distiller(palette = "Purples",direction=1)+
   labs(x="Truth",
        y="Prediction",
        title="Confusion matrix")
-
+dev.off()
 ```
 
 
