@@ -48,15 +48,12 @@ knitr::opts_chunk$set(echo = TRUE, warning = F, comment = F, message = F)
 
 # Where blue green lakes are
 
-## BELLA MAKE DECISIONS HERE
-
 ## Pull in data
 ```{r}
 load("data/glcp_sub.RData")
 load("data/color_summary.RData")
 load("data/lake_descriptor.RData")
 load("data/ls_elev.RData")
-
 # load("data/nhd_lakes.RData")
 
 
