@@ -33,10 +33,15 @@ library(caret)
 library(rpart)
 library(yardstick)
 library(rpart.plot)
+library(here)
+library(data.table)
 
+# Use dplyr select
+select<-dplyr::select
 
 sf_use_s2(use_s2 = T)
 knitr::opts_chunk$set(echo = TRUE, warning = F, comment = F, message = F)
+
 ```
 
 
@@ -44,11 +49,50 @@ knitr::opts_chunk$set(echo = TRUE, warning = F, comment = F, message = F)
 
 ## BELLA MAKE DECISIONS HERE
 
+## Pull in data
+```{r}
+load("data/glcp_sub.RData")
+load("data/color_summary.RData")
+load("data/lake_descriptor.RData")
+load("data/ls_elev.RData")
+
+# load("data/nhd_lakes.RData")
+
+
+```
+
+
 ### Super join to all things w/ Median DWL 2009-2020
 
 ```{r}
 
+#Grab modern decade median color
+co_summary_median <- ls_co %>%
+  dplyr::select(-year, -sat) %>%
+  mutate(month = month(date),
+         year = year(date),
+         doy = yday(date)) %>%
+  filter(month %in% 7:9, 
+         doy <= 258, #Sept 14/15
+         year >= 2009,
+         elevation > 1400) %>% 
+  group_by(Hylak_id) %>%
+  add_count() %>%
+  filter(n >= 30) %>%
+  group_by(Hylak_id) %>%
+  summarize(across(c(Blue:dWL),
+                   .fns = list(mean = mean, 
+                               sd = sd, 
+                               max = max,
+                               min = min,
+                               median = median), na.rm = T,
+                   .names = "{.col}-{.fn}"))%>% 
+  ungroup() %>%
+  pivot_longer(cols = `Blue-mean`:`dWL-median`,
+               names_to = c('var','stat'),
+               names_sep = '-')
 
+#Grab just median dWL for each lake
 dwl_medians <- co_summary_median %>%
   filter(var == 'dWL',
          stat == 'median') %>%
@@ -68,28 +112,51 @@ blue_green_2018 <- glcp_high_lakes %>%
                                           'Green/murky'))) %>%
   dplyr::filter(!is.na(dWL)) %>%
   inner_join(lake_descriptor) %>%
-  mutate(air_temp = mean_annual_temp_k - 273.15) %>%
+  mutate(air_temp = mean_annual_temp_k - 273.15,
+         PctUrb2016Ws = PctUrbLo2016Ws + PctUrbMd2016Ws + PctUrbHi2016Ws,
+         PctWet2016Ws = PctWdWet2016Ws + PctHbWet2016Ws) %>%
   # LakeCAT and GLCP predictors, maybe add in land use when fixed
   dplyr::select(precip = mean_monthly_precip_mm,
                 air_temp,
                 res = lake_rsvr_class,
-                area = areasqkm,
+                lake_connectivity = lake_connectivity_class,
+                area = areasqkm, # different from ws_area below???
                 elev = elevation,
                 meandepth,
                 pop_sum,
                 maxdepth,
                 ws_area = WsAreaSqKm,
-                no3 = NO3_2018Ws,
+                no3_dep = NO3_2018Ws,
+                nh3_dep = NH4_2018Ws,
                 carb = PctCarbResidWs,
-                sil = PctSilicicWs,
+                sil = PctSilicicWs, 
+                WALA, #drainage ratio, watershea area:lake area
+                LSA = lake_waterarea_ha, #lake surface area [ha]
+                perc_open_water = PctOw2016Ws, #% open water 2016
+                perc_ice = PctIce2016Ws,#% of catchment area classified as ice/snow land cover
+                perc_urban = PctUrb2016Ws, #% of catchment area classified as developed, low+med+high-intensity land use
+                perc_decid = PctDecid2016Ws, #% of catchment area classified as deciduous forest land cover
+                perc_conifer = PctConif2016Ws, #% of catchment area classified as evergreen forest land cover 
+                perc_mixedForest = PctMxFst2016Ws,#% of catchment area classified as mixed deciduous/evergreen forest land cover
+                perc_shrub = PctShrb2016Ws, #% of catchment area classified as shrub/scrub land cover 
+                perc_grass = PctGrs2016Ws, #% of watershed area classified as grassland/herbaceous land cover 
+                perc_hay = PctHay2016Ws, #% of watershed area classified as hay land use
+                perc_crop = PctCrop2016Ws, #% of watershed area classified as crop land use
+                perc_wetland = PctWet2016Ws, #% of watershed area classified as herbaceous+woody wetland land cover
+                slope = SlopeWs, #Mean watershed slope, **I THINK**
+                cti = WetIndexWs, #Mean Composite Topographic Index (CTI)
                 dWL,
                 Hylak_id,
                 group) %>%
   na.omit(.) #Everything has to be complete data. 
 
-
-
-
+  
+#How many sites do we drop with na.omit()
+# length(unique(blue_green_2018$Hylak_id))
+#1318
+# blue_green_2018 <- blue_green_2018 %>% na.omit(.)
+# length(unique(blue_green_2018$Hylak_id))
+#956
 
 
 
@@ -154,8 +221,9 @@ tm_shape(states) +
              border.col = 'black',
              border.lwd = 1,
              jitter = .3) + 
-  tm_legend(legend.position = c(0.1,0),
-            legend.bg.color = 'gray90') 
+  tm_legend(legend.position = c(0,0),
+            legend.bg.color = 'gray90',
+            legend.frame = 'black') 
 
 dev.off()
 
