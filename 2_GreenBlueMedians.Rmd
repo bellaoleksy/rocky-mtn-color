@@ -128,7 +128,6 @@ blue_green_2018 <- glcp_high_lakes %>%
                 nh3_dep = NH4_2018Ws,
                 carb = PctCarbResidWs,
                 sil = PctSilicicWs, 
-                WALA, #drainage ratio, watershea area:lake area
                 LSA = lake_waterarea_ha, #lake surface area [ha]
                 perc_open_water = PctOw2016Ws, #% open water 2016
                 perc_ice = PctIce2016Ws,#% of catchment area classified as ice/snow land cover
@@ -146,6 +145,7 @@ blue_green_2018 <- glcp_high_lakes %>%
                 dWL,
                 Hylak_id,
                 group) %>%
+  mutate(WALA=area/LSA) %>% #drainage ratio, watershea area:lake area)
   na.omit(.) #Everything has to be complete data. 
 
   
@@ -367,5 +367,12 @@ plot_confusion_matrix(conf_mat,
 dev.off()
 ```
 
+Plot some of these relationship for funsies
 
+```{r}
+head(blue_green_2018)
 
+blue_green_2018 %>%
+ggplot(aes(x=ws_area/area, y=WALA))+
+  geom_point()
+```
