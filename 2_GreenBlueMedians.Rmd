@@ -35,6 +35,7 @@ library(yardstick)
 library(rpart.plot)
 library(here)
 library(data.table)
+library(cvms)
 
 # Use dplyr select
 select<-dplyr::select
@@ -287,7 +288,8 @@ mapshot(m1, url = 'figs/lake_color_decade.html')
 
 
 ```{r}
-
+#cart plot examples here:
+#http://www.milbo.org/rpart-plot/prp.pdf
 
 
 set.seed(4444)
@@ -325,11 +327,17 @@ accuracy(test_d,group,guess)
 
 png(filename = 'figs/bg_tree.png',
     width = 7, height = 8, units = 'in', res = 300)
-rpart.plot(cart_mod, type = 2,
-           extra = 2, clip.right.labs = F,
+rpart.plot(cart_mod,
+           # type = 4, #2=split labels below node labels; but I like the look of 4 with labels on both connecting lines and no "yesno"
+           extra = 2,#2 = class rate; 106 = prob. of 2nd class + percent of observations
+           under = TRUE, #I kind of like the look of this better
+           clip.right.labs = FALSE,
            branch = 0.3,
+           branch.type = 5, yesno=FALSE, #If you comment out type=4, I kind of like the look of this
+           branch.col = "gray",
+           main="Factors that influence lake category",
            box.palette = list('#1f78b4','#33a02c'))
-
+# rpart.rules(cart_mod, cover = TRUE)
 dev.off()
 
 
@@ -341,8 +349,20 @@ autoplot(cm, type = "heatmap") +
 dev.off()
 
 
-
-
+##Alternative confusion matrix using cvms library, ggplot2 friendly
+conf_mat <- confusion_matrix(targets = test_d$group,
+                             predictions = test_d$guess)
+plot_confusion_matrix(conf_mat,
+                      add_counts = TRUE,
+                      add_row_percentages = FALSE,
+                      add_col_percentages = FALSE,
+                      counts_on_top = TRUE,
+                      tile_border_color = 'black',
+                      tile_border_linetype = "solid")+
+  ggplot2::scale_fill_distiller(palette = "Greys",direction=1)+
+  labs(x="Truth",
+       y="Prediction",
+       title="Confusion matrix")
 
 ```
 
