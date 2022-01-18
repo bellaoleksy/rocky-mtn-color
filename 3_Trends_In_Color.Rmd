@@ -31,6 +31,8 @@ library(caret)
 library(rpart)
 library(yardstick)
 library(rpart.plot)
+library(patchwork)
+library(cowplot)
 
 
 sf_use_s2(use_s2 = T)
@@ -234,13 +236,28 @@ bg.fui = tibble(
   "#adb55f", "#a8a965", "#ae9f5c", "#b3a053", "#af8a44", "#a46905", "#9f4d04")
 )
 
+##Legend only
+legend<-ggplot() + 
+  geom_rect(data = bg.fui, 
+            aes(ymin = ymin, ymax = ymax, xmin = -5, xmax = 100, fill = color)) + 
+  scale_fill_identity() + 
+  theme_few() +
+  scale_x_continuous(expand = c(0, 0))+
+  scale_y_continuous(expand = c(0, 0))+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_text(size=5),
+        axis.title.y=element_text(size=6),
+        plot.title=element_text(size=6, hjust=-0.05))+
+  labs(y="Dominant wavelength (nm)",
+       title="Forel-Ule\ncolor")
 
 # make prettier
 png(filename = 'figs/dwl_hist.png', width = 4, height = 4,
     units = 'in', res = 300)
 
 
-ggplot() + 
+base<-ggplot() + 
   facet_wrap(~decade, ncol = 1) + 
   geom_rect(data = bg.fui, 
             aes(xmin = ymin, xmax = ymax, ymin = -5, ymax = 100, fill = color)) + 
@@ -248,13 +265,28 @@ ggplot() +
   geom_histogram(data = high_modes, aes(x=dWL, y = ..density..), fill = NA,
                  color = 'black', alpha = .3, bins = 40) + 
   geom_density(data = high_modes, aes(x=dWL)) + 
+  scale_x_continuous(expand = c(0, 0))+ #get rid of whitespace
   scale_fill_identity() + 
   theme_few() +
-  coord_cartesian(ylim = c(0,.03))  
+  coord_cartesian(ylim = c(0,.03))  +
+  labs(x="Dominant wavelength (nm)",
+       y="Density")
 
+base+inset_element(legend, 0.85, 0.75, 1, 1)
+
+layout <- '
+A#
+AB
+A#
+'
+wrap_plots(A = base, B = legend, design = layout)+
+  plot_layout(widths = c(5, 0.5))
 
 
 dev.off()
+
+
+
 
 
 
@@ -285,11 +317,13 @@ ggplot(high_modes, aes(x= mean_monthly_precip_mm, y = dWL,
 ```{r}
 dWL_trends <- trend_plotter()
 
-##IAO-- this is cool but I think we will want to only look at median. Or if we want to look at max, maybe filter down to only sites with >3 observations a year?
-png(filename = 'figs/dwl_hist.png', width = 4,
-    height = , units = 'in', res = 300)
+##IAO-- this is cool but I think we will want to only look at median.
+#Or if we want to look at max, maybe filter down to only sites with >3 observations a year?
+
+# png(filename = 'figs/dwl_hist.png', width = 4,
+#     height = , units = 'in', res = 300)
 dWL_trends[[2]]
-dev.off()
+# dev.off()
 
 ```
 
@@ -309,7 +343,8 @@ dwl_all <- dwl %>%
   unnest(data)
 
 
-set.seed(111)
+# set.seed(111)
+set.seed(1)
 dwl_specials <- dwl_all %>%
   # filter(abs(slope) >= 1 | Trend == 'No trend') %>%
   # filter(p.value < 0.05 | Trend == 'No trend') %>% # Had to change from 0.001 to 0.05 to get a blue->green example lake
@@ -322,25 +357,34 @@ dwl_specials <- dwl_all %>%
 full_spec <- dwl_all %>%
   filter(Hylak_id %in% dwl_specials)
 
+#How many lakes in each trend category?
+trend_labels<-dwl_all %>%
+  group_by(Trend) %>%
+  summarize(n=length(unique(Hylak_id))) %>%
+  mutate(perc=(n/sum(n))*100,
+         perc=round(perc,0)) 
 
-# png(filename = 'figs/Trend Examples.png',
-#     width = 6,
-#     height = 4,
-#     res = 300,
-#     units = 'in')
+#Export
+png(filename = 'figs/Trend Examples.png',
+    width = 6,
+    height = 4,
+    res = 600,
+    units = 'in')
 ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) + 
   geom_smooth(method = 'lm',
               se = FALSE,
               col = 'gray',
               alpha = 0.1) + 
-  geom_point(data = full_spec, shape=21, fill = 'white') + 
+  geom_point(data = full_spec, shape=21) + 
   geom_smooth(data = full_spec, color = 'black',
               method = 'lm',
               se = FALSE) + 
+  geom_text(x = 1990, y = 585, aes(group=Trend, label = paste("n =",n)), data = trend_labels)+ #Add label for sample size
   facet_wrap(~Trend) + 
-  theme_few()
-## IAO -- Add sample size to plots 
-# dev.off()
+  theme_few()+
+  labs(y="Dominant wavelength (nm)",
+       x="Year")
+dev.off()
 ```
 
 
