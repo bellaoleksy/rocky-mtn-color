@@ -352,7 +352,6 @@ dwl_specials <- dwl_all %>%
   group_by(Trend) %>%
   sample_n(1) %>%
   pull(Hylak_id) 
-# IAO Why are no points coming up for Blue->Bluer and Blue->Green
 
 full_spec <- dwl_all %>%
   filter(Hylak_id %in% dwl_specials)
