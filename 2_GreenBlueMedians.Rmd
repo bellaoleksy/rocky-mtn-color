@@ -129,7 +129,7 @@ blue_green_2018 <- glcp_high_lakes %>%
                 carb = PctCarbResidWs,
                 sil = PctSilicicWs, 
                 LSA = lake_waterarea_ha, #lake surface area [ha]
-                perc_open_water = PctOw2016Ws, #% open water 2016
+                # perc_open_water = PctOw2016Ws, #% open water 2016
                 perc_ice = PctIce2016Ws,#% of catchment area classified as ice/snow land cover
                 perc_urban = PctUrb2016Ws, #% of catchment area classified as developed, low+med+high-intensity land use
                 perc_decid = PctDecid2016Ws, #% of catchment area classified as deciduous forest land cover
@@ -140,12 +140,15 @@ blue_green_2018 <- glcp_high_lakes %>%
                 perc_hay = PctHay2016Ws, #% of watershed area classified as hay land use
                 perc_crop = PctCrop2016Ws, #% of watershed area classified as crop land use
                 perc_wetland = PctWet2016Ws, #% of watershed area classified as herbaceous+woody wetland land cover
+                perc_barren = PctBl2016Ws, #% of watershed area classified as barren land cover
                 slope = SlopeWs, #Mean watershed slope, **I THINK**
                 cti = WetIndexWs, #Mean Composite Topographic Index (CTI)
                 dWL,
                 Hylak_id,
                 group) %>%
-  mutate(WALA=area/LSA) %>% #drainage ratio, watershea area:lake area)
+  mutate(WALA=area/LSA,#drainage ratio, watershea area:lake area)
+         n_dep=no3_dep+nh3_dep) %>% #total N deposition
+  # select(-c(no3_dep,nh3_dep)) %>%
   na.omit(.) #Everything has to be complete data. 
 
   
@@ -198,6 +201,39 @@ hil <- hillShade(slope, aspect)
 
 states <- USAboundaries::us_states()
 
+#color for manually created legend
+bg.fui = tibble(
+  ymin = c(470,475,480,485,489,495,509,530,549,559,564,567,568,569,570,573,575,577,579,581,583),
+  ymax = c(475,480,485,489,495,509,530,549,559,564,567,568,569,570,573,575,577,579,581,583,590),
+  color = c(
+  "#2158bc", "#316dc5", "#327cbb", "#4b80a0", "#568f96", "#6d9298", "#698c86", 
+  "#759e72", "#7ba654", "#7dae38", "#94b660","#94b660", "#a5bc76", "#aab86d", 
+  "#adb55f", "#a8a965", "#ae9f5c", "#b3a053", "#af8a44", "#a46905", "#9f4d04")
+)
+
+##Legend only
+png(filename = 'figs/F-U_legend.png',
+    width = 2.0, height = 11.8, units = 'in', res = 600)
+
+ggplot() + 
+  geom_rect(data = bg.fui, 
+            aes(ymin = ymin, ymax = ymax, xmin = -5, xmax = 100, fill = color)) + 
+  scale_fill_identity() + 
+  theme_few() +
+  scale_x_continuous(expand = c(0, 0))+
+  scale_y_continuous(expand = c(0, 0), position="right")+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.y=element_text(size=28),
+        axis.title.y=element_blank(),
+        plot.title=element_text(size=28, hjust=0.5),
+        plot.subtitle=element_text(size=24, hjust=0.5),
+        plot.background = element_rect(fill="#FFFFFF"))
+  # labs(y=" ",
+  #      title="Forel-Ule color",
+  #      subtitle="Dominant\nwavelength (nm)")
+dev.off()
 
 png(filename = 'figs/bg_better_map.png',
     width = 4, height = 6, units = 'in', res = 300)
@@ -213,15 +249,37 @@ tm_shape(ras) +
 tm_shape(states) + 
   tm_borders(lwd = 1,
              col = 'black') + 
-  tm_shape(site_cols) + 
+tm_shape(site_cols) + 
   tm_bubbles(size = .2,
              col = 'color',
              border.col = 'black',
              border.lwd = 1,
-             jitter = .3) + 
-  tm_legend(legend.position = c(0,0),
+             jitter = .3) +
+tm_legend(legend.position = c(0,0),
             legend.bg.color = 'gray90',
             legend.frame = 'black') 
+
+
+# base_map+inset_element(legend, 0.85, 0.75, 1, 1)
+# 
+# layout <- '
+# A#
+# AB
+# A#
+# '
+# wrap_plots(A = base_map, B = legend, design = layout)+
+#   plot_layout(widths = c(5, 0.5))
+
+# base_map_grob<-tmap_grob(base_map)
+# 
+# plot_grid(base_map_grob,legend,
+#           rel_widths = c(2,0.5),
+#           rel_heights =c(1,1))
+#   # scale=c(1,0.75))
+# 
+# ggpubr::ggarrange(base_map_grob, legend,
+#                   heights = c(1, 0.25),
+#                   widths = c(1, 1))
 
 dev.off()
 
@@ -314,7 +372,8 @@ train_d <- train_d %>%
 
 cart_mod <- rpart(group ~ ., data = train_d,
                   method = 'class',
-                  cp = 0.03) # CP is a tuning knob for tree complexity. 
+                  cp = 0.025) #updated IAO 2022-01-18
+                  # cp = 0.03,) # CP is a tuning knob for tree complexity. 
 
 
 
@@ -332,7 +391,7 @@ rpart.plot(cart_mod,
            branch = 0.3,
            branch.type = 5, yesno=FALSE, #If you comment out type=4, I kind of like the look of this
            branch.col = "gray",
-           main="Factors that influence lake category",
+           # main="Factors that influence lake category",
            box.palette = list('#1f78b4','#33a02c'))
 # rpart.rules(cart_mod, cover = TRUE)
 dev.off()
@@ -362,17 +421,53 @@ plot_confusion_matrix(conf_mat,
                       darkness=0.7)+
   ggplot2::scale_fill_distiller(palette = "Purples",direction=1)+
   labs(x="Truth",
-       y="Prediction",
-       title="Confusion matrix")
+       y="Prediction")
 dev.off()
+
+
 ```
 
 Plot some of these relationship for funsies
 
 ```{r}
-head(blue_green_2018)
+# head(blue_green_2018)
+
+#Slope histogram
+blue_green_2018 %>%
+  ggplot( aes(x=slope, fill=group)) +
+    geom_histogram( color="#e9ecef", alpha=0.9, position = 'identity') +
+    scale_fill_manual(values=c('#1f78b4','#33a02c'))
+
+#elevation histogram
+blue_green_2018 %>%
+  ggplot( aes(x=elev, fill=group)) +
+    geom_histogram( color="#e9ecef", alpha=0.9, position = 'identity') +
+    scale_fill_manual(values=c('#1f78b4','#33a02c'))
+blue_green_2018 %>%
+  ggplot( aes(y=elev, x=group, fill=group)) +
+    geom_boxplot(alpha=0.9) +
+    scale_fill_manual(values=c('#1f78b4','#33a02c'))
+#Generally higher elevation lakes are blue, no surprise there. 
+wilcox.test(elev~group, data=blue_green_2018)
+
+
+
+# no3 and nh4 deposition come up in the CART plot. Looks at historgrams
+blue_green_2018 %>%
+  ggplot( aes(x=nh3_dep, fill=group)) +
+    geom_histogram( color="#e9ecef", alpha=0.9, position = 'identity') +
+    scale_fill_manual(values=c('#1f78b4','#33a02c'))
 
 blue_green_2018 %>%
-ggplot(aes(x=ws_area/area, y=WALA))+
-  geom_point()
+  ggplot( aes(x=no3_dep, fill=group)) +
+    geom_histogram( color="#e9ecef", alpha=0.9, position = 'identity') +
+    scale_fill_manual(values=c('#1f78b4','#33a02c'))
+
+
+#Are deposition rates higher at high elevations?
+blue_green_2018 %>%
+  ggplot(aes(x=nh3_dep,y=elev, fill=group))+
+  geom_point(shape=21,size=3, alpha=0.9)+
+  scale_fill_manual(values=c('#1f78b4','#33a02c'))
+
 ```
