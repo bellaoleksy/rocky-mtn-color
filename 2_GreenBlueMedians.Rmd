@@ -36,6 +36,8 @@ library(rpart.plot)
 library(here)
 library(data.table)
 library(cvms)
+library(skimr)
+library(huxtable)
 
 # Use dplyr select
 select<-dplyr::select
@@ -146,7 +148,7 @@ blue_green_2018 <- glcp_high_lakes %>%
                 dWL,
                 Hylak_id,
                 group) %>%
-  mutate(WALA=area/LSA,#drainage ratio, watershea area:lake area)
+  mutate(WALA=ws_area/area,#drainage ratio, watershea area:lake area)
          n_dep=no3_dep+nh3_dep) %>% #total N deposition
   # select(-c(no3_dep,nh3_dep)) %>%
   na.omit(.) #Everything has to be complete data. 
@@ -470,4 +472,91 @@ blue_green_2018 %>%
   geom_point(shape=21,size=3, alpha=0.9)+
   scale_fill_manual(values=c('#1f78b4','#33a02c'))
 
+```
+
+## Table 1. 
+```{r}
+head(blue_green_2018)
+skim(blue_green_2018)
+
+covariates<-blue_green_2018 %>%
+  skim() %>%
+  filter(skim_type=="numeric")  %>%
+  select(skim_variable, numeric.mean, numeric.sd) %>%
+  mutate(
+    numeric.mean=round(numeric.mean,1),
+    numeric.sd=round(numeric.sd,1),
+    meansd = paste0(numeric.mean, " (",numeric.sd,")")) %>%
+  select(-numeric.mean,-numeric.sd) %>%
+  filter(!skim_variable %in% list("Hylak_id","dWL","LSA","n_dep")) %>%
+    mutate(Description=NA) %>%
+    mutate(Description=
+           ifelse(skim_variable=="precip", "mean monthly precipitation (mm)", 
+           ifelse(skim_variable=="air_temp","mean annual air temperature (°C)", 
+           ifelse(skim_variable=="area", "lake surface area (km2)",
+           ifelse(skim_variable=="elev", "lake elevation (m)",
+           ifelse(skim_variable=="pop_sum", "total human population",
+           ifelse(skim_variable=="maxdepth", "max lake depth (m)",
+           ifelse(skim_variable=="meandepth", "mean lake depth (m)",
+           ifelse(skim_variable=="ws_area", "watershed area (km2)",
+           ifelse(skim_variable=="no3_dep", "total no3 deposition (2018)",
+           ifelse(skim_variable=="nh3_dep", "total nh3 deposition (2018)",
+           ifelse(skim_variable=="carb", "some geological descriptor",
+           ifelse(skim_variable=="sil", "some geological descriptor",
+           ifelse(skim_variable=="perc_ice", "% of watershed area classified as ice/snow land cover",
+           ifelse(skim_variable=="perc_urban", "% of catchment area classified as developed, low+med+high-intensity land use",
+           ifelse(skim_variable=="perc_decid", "% of catchment area classified as deciduous forest land cover",
+           ifelse(skim_variable=="perc_conifer", "% of catchment area classified as evergreen forest land cover ",
+           ifelse(skim_variable=="perc_mixedForest", "% of catchment area classified as mixed deciduous/evergreen forest land cover",
+           ifelse(skim_variable=="perc_shrub", "% of catchment area classified as shrub/scrub land cover ",
+           ifelse(skim_variable=="perc_grass", "% of watershed area classified as grassland/herbaceous land cover ",
+           ifelse(skim_variable=="perc_wetland", "% of watershed area classified as herbaceous+woody wetland land cover",
+           ifelse(skim_variable=="perc_hay", "% of watershed area classified as hay land use",
+           ifelse(skim_variable=="perc_crop", "% of watershed area classified as crop land use",
+           ifelse(skim_variable=="perc_barren", "% of watershed area classified as barren land cover",
+           ifelse(skim_variable=="slope", "*Check on this* Mean watershed slope angle",
+           ifelse(skim_variable=="WALA", "Watershed area:lake area",
+           ifelse(skim_variable=="cti", "*Check on this* Composite topographic index"," "))))))))))))))))))))))))))) %>%
+  mutate(skim_variable=recode(skim_variable,
+                              precip="precip.",
+                              air_temp="air temp.",
+                              area="LA (km2)",
+                              elev="elev. (m)",
+                              meandepth="Mean depth (m)",
+                              maxdepth="Max depth (m)", 
+                              pop_sum="Population",  
+                              ws_area="WSA (km2)",
+                              WALA="WA:LA",
+                              no3_dep="NO3 dep.", 
+                              nh3_dep="NH3 dep.",
+                              carb="carb.",
+                              sil="sil.",
+                              perc_ice="% ice,",
+                              perc_urban="% urban",
+                              perc_decid="% decid.",
+                              perc_conifer="% conifer",
+                              perc_mixedForest="% mixed forest",  
+                              perc_shrub="% shrub",
+                              perc_grass="% grassland",     
+                              perc_wetland="% wetland",
+                              perc_hay="% hay",
+                              perc_crop="% cropland",      
+                              perc_barren="% barren",
+                              cti="CTI"))
+
+###EXPORT TABLE
+summary_table_export <-
+  covariates %>%
+  rename("Variable"=skim_variable,
+         "Mean (sd)"=meansd) %>%
+  hux(add_colnames=TRUE) %>%
+  # add_footnote() %>%
+  set_bold(row = 1, col = everywhere, value = TRUE) %>% 
+  set_all_borders(TRUE) %>%
+  set_all_padding(0) %>%
+  set_outer_padding(0) %>%
+  theme_article()
+
+
+quick_docx(summary_table_export, file = 'figs/Table1.docx')
 ```
