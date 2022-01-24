@@ -149,8 +149,10 @@ blue_green_2018 <- glcp_high_lakes %>%
                 Hylak_id,
                 group) %>%
   mutate(WALA=ws_area/area,#drainage ratio, watershea area:lake area)
-         n_dep=no3_dep+nh3_dep) %>% #total N deposition
-  # select(-c(no3_dep,nh3_dep)) %>%
+         n_dep=no3_dep+nh3_dep,#total N deposition
+         perc_forest=perc_decid+perc_conifer+perc_mixedForest,#total forest cover
+         perc_ag=perc_hay+perc_crop) %>% #total ag cover
+  select(-c(perc_decid,perc_conifer,perc_mixedForest)) %>%
   na.omit(.) #Everything has to be complete data. 
 
   
@@ -347,16 +349,43 @@ mapshot(m1, url = 'figs/lake_color_decade.html')
 ```{r}
 #cart plot examples here:
 #http://www.milbo.org/rpart-plot/prp.pdf
+png(filename = 'figs/dwl_hist_2009-2020.png', width = 4, height = 4,
+    units = 'in', res = 300)
+spatial_hist<-ggplot() + 
+  geom_rect(data = bg.fui, 
+            aes(xmin = ymin, xmax = ymax, ymin = -5, ymax = 100, fill = color)) + 
+  geom_vline(xintercept = 530, linetype = 3) +
+  geom_histogram(data = blue_green_2018, aes(x=dWL, y = ..density..), fill = NA,
+                 color = 'black', alpha = .3, bins = 40) + 
+  geom_density(data = blue_green_2018, aes(x=dWL)) + 
+  scale_x_continuous(expand = c(0, 0))+ #get rid of whitespace
+  scale_fill_identity() + 
+  theme_few() +
+  coord_cartesian(ylim = c(0,.04))  +
+  labs(x="Dominant wavelength (nm)",
+       y="Density")
+spatial_hist
+dev.off()
+
+
 
 
 set.seed(4444)
 
 train_d <- blue_green_2018 %>%
-  sample_frac(0.8)
+  sample_frac(0.8) %>%
+  mutate_if(is.numeric, round, digits=0) %>%
+  rename("MAAT °C"=air_temp,
+         "mean depth"=meandepth,
+         WSA=ws_area)
 
 test_d <- blue_green_2018 %>%
   dplyr::filter(!Hylak_id %in% train_d$Hylak_id) %>%
-  dplyr::select(-Hylak_id,-dWL) 
+  dplyr::select(-Hylak_id,-dWL) %>%
+  mutate_if(is.numeric, round, digits=0)%>%
+  rename("MAAT °C"=air_temp,
+         "mean depth"=meandepth,
+         WSA=ws_area)
 
 train_d <- train_d %>%
     dplyr::select(-Hylak_id,-dWL) 
@@ -374,8 +403,7 @@ train_d <- train_d %>%
 
 cart_mod <- rpart(group ~ ., data = train_d,
                   method = 'class',
-                  cp = 0.025) #updated IAO 2022-01-18
-                  # cp = 0.03,) # CP is a tuning knob for tree complexity. 
+                  cp = 0.03) # CP is a tuning knob for tree complexity.
 
 
 
@@ -383,8 +411,8 @@ test_d$guess <- predict(cart_mod, test_d, 'class')
 cm <- conf_mat(test_d, group,guess)
 accuracy(test_d,group,guess)
 
-png(filename = 'figs/bg_tree.png',
-    width = 7, height = 8, units = 'in', res = 300)
+# png(filename = 'figs/bg_tree.png',
+# width = 7, height = 8, units = 'in', res = 300)
 rpart.plot(cart_mod,
            # type = 4, #2=split labels below node labels; but I like the look of 4 with labels on both connecting lines and no "yesno"
            extra = 2,#2 = class rate; 106 = prob. of 2nd class + percent of observations
@@ -395,42 +423,146 @@ rpart.plot(cart_mod,
            branch.col = "gray",
            # main="Factors that influence lake category",
            box.palette = list('#1f78b4','#33a02c'))
-# rpart.rules(cart_mod, cover = TRUE)
-dev.off()
+# dev.off()
 
 
-png(filename = 'figs/bg_confusion_matrix.png',
-    width = 6, height = 5,
-    units = 'in', res = 300)
-autoplot(cm, type = "heatmap") +
-  scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
-dev.off()
-
-
-##Alternative confusion matrix using cvms library, ggplot2 friendly
+## Create manually because the plot_confusion_matrix function is pissing me off
 conf_mat <- confusion_matrix(targets = test_d$group,
                              predictions = test_d$guess)
-png(filename = 'figs/bg_confusion_matrix_gg.png',
-    width = 6, height = 5,
-    units = 'in', res = 300)
-plot_confusion_matrix(conf_mat,
-                      add_counts = TRUE,
-                      add_row_percentages = FALSE,
-                      add_col_percentages = FALSE,
-                      counts_on_top = TRUE,
-                      tile_border_color = 'black',
-                      tile_border_linetype = "solid",
-                      darkness=0.7)+
-  ggplot2::scale_fill_distiller(palette = "Purples",direction=1)+
-  labs(x="Truth",
-       y="Prediction")
+table<-data.frame(conf_mat$`Confusion Matrix`)
+
+plotTable <- table %>%
+  group_by(Target) %>%
+  mutate(prop = N/sum(N),
+         prop = round(prop,2))
+
+# fill alpha relative to sensitivity/specificity by proportional outcomes within reference groups (see dplyr code above as well as original confusion matrix for comparison)
+# png(filename = 'figs/bg_confusion_matrix_gg.png',
+#     width = 6, height = 5,
+#     units = 'in', res = 300)
+conf_matrix_plot<-ggplot(data = plotTable,
+       mapping = aes(x = Target, y = Prediction, fill = Pos_Blue.clear)) +
+  geom_tile(aes(fill=Pos_Blue.clear), color="black") +
+  scale_x_discrete(expand = c(0, 0))+ #remove white space
+  scale_y_discrete(expand = c(0, 0))+ #remove white space
+  geom_text(aes(label = paste0("n=",N)), vjust = .5,  alpha = 1, size=4) +
+  geom_text(aes(label = paste0("prop.=",prop)), vjust = 2.0,  alpha = 1, size=3) +
+  scale_fill_manual(values = c(TP = "#1f78b4", TN = "#33a02c",
+                               FN = "white" , FP ="white")) +
+  theme_few() +
+  # xlim(rev(levels(table$Target)))+
+  theme(legend.position="none")
+conf_matrix_plot
+# dev.off()
+
+
+#Old -- Matt's confusion matrix
+# png(filename = 'figs/bg_confusion_matrix.png',
+#     width = 6, height = 5,
+#     units = 'in', res = 300)
+# autoplot(cm, type = "heatmap") +
+#   scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
+# dev.off()
+
+##Alternative confusion matrix using cvms library, ggplot2 friendly, but irritating to customize
+# conf_mat <- confusion_matrix(targets = test_d$group,
+#                              predictions = test_d$guess)
+# conf_matrix_plot<-plot_confusion_matrix(conf_mat,
+#                       add_counts = TRUE,
+#                       target_col = "Target",
+#                       prediction_col = "Prediction",
+#                       add_row_percentages = FALSE,
+#                       add_col_percentages = FALSE,
+#                       counts_on_top = TRUE,
+#                       tile_border_color = 'black',
+#                       tile_border_linetype = "solid",
+#                       darkness=0.7)+
+#   ggplot2::scale_fill_distiller(palette = "Greys",direction=1)+
+#   ggthemes::theme_few(base_size=18)+
+#   labs(x="Truth",
+#        y="Prediction")
+# conf_matrix_plot
+
+
+
+
+
+
+
+##GGPARTY? Another way
+library(ggparty)
+cart_mod_party<-as.party(cart_mod)
+plot(cart_mod_party)
+tree_plot<-ggparty(cart_mod_party) +
+  geom_edge(size=1, color="grey50") +
+    # geom_node_label(aes(label = splitvar), ids = "inner") +
+  geom_edge_label() +
+  geom_node_splitvar() +
+  geom_node_plot(gglist = list(geom_bar(aes(x = "", fill = group),
+                                    position = position_fill()),#standardizes so each stack has constant height; plots proportions.
+                               (scale_fill_manual(values=c('#1f78b4','#33a02c'))),
+                                                               (theme_few()),
+                               (theme(plot.margin = unit(c(0,0.2,0,0.2), "cm"),
+                                axis.title.x=element_blank(),
+                                axis.text.x=element_blank(),
+                                axis.ticks.x=element_blank(),
+                                legend.position="none")),
+                               (scale_x_discrete(expand = c(0, 0))), #remove white space
+                               # (scale_y_discrete(expand = c(0, 0))), #remove white space)
+                               ylab("Proportion")),
+                               shared_axis_labels = TRUE) +
+  theme(plot.margin = unit(c(0,0,0,0), "cm"))
+tree_plot
+
+## "Your decision tree may be cool, but what if I tell you you can make it hot?" LMAO.
+# https://trang1618.github.io/treeheatr/articles/explore.html
+# library(treeheatr)
+# 
+# # build tree using rpart:
+# x <- partykit::as.party(cart_mod)
+# 
+# tree_plot<-heat_tree(x,
+#           target_lab = 'group',
+#           target_cols = c('#1f78b4','#33a02c'),
+#           feats = NA, 
+#           # feats = c('slope', 'maxdepth', 'WALA', 'air_temp'), #select only features on the tree
+#           # show = 'tree-only',
+#           # cont_legend = TRUE, cate_legend = TRUE,
+#           panel_space = 0.05, target_space = 0.2, tree_space_bottom = 0.1, heat_rel_height = 0.1,
+#           edge_vars = list(size = 1, color = 'grey'))
+# tree_plot
+
+
+#Combine
+library(patchwork)
+# (tree_plot + conf_matrix_plot + spatial_hist )+
+#   plot_layout(ncol = 1) 
+# 
+# spatial_hist / (tree_plot + conf_matrix_plot + plot_layout(widths = c(1,0.5))) + 
+#   plot_layout(heights = c(0.5,1.5))
+
+##Arrangement 1
+png(filename = 'figs/spatial_plots.png',
+width = 6, height = 7, units = 'in', res = 600)
+C<-(spatial_hist+conf_matrix_plot)
+(C/tree_plot)+ plot_layout(heights = c(0.3,1))+  plot_annotation(tag_levels = 'A')
+#For top right alginment: inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) 
 dev.off()
+
+##Arrangement 2
+B <- spatial_hist / conf_matrix_plot +   plot_layout(heights = c(2,1))
+tree_plot + B  +   plot_layout(widths = c(2,1)) +  plot_annotation(tag_levels = 'A')
+
+##Arrangement 3
+(spatial_hist / tree_plot + inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) +
+   plot_layout(heights = c(0.5,1.5))+
+   plot_annotation(tag_levels = list(c('A', 'B'), '1'))
 
 
 ```
 
-Plot some of these relationship for funsies
 
+Plot some of these relationship for funsies
 ```{r}
 # head(blue_green_2018)
 
