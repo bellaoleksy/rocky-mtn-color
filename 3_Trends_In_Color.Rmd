@@ -60,7 +60,7 @@ co_summary <- ls_co %>%
          doy <= 258) %>% #Sept 14/15
   group_by(Hylak_id,year) %>%
   add_count() %>%
-  filter(year > 1984) %>%
+  filter(year >= 1984) %>% #changed to >= so we don't drop 1984... 
   filter(n >= 3) %>% # at least 3 observations per year
   group_by(Hylak_id) %>%
   mutate(unique_years = n_distinct(year)) %>%
@@ -96,7 +96,8 @@ filled_enough <- co_summary %>%
 co_full <- co_summary %>%
   filter(Hylak_id %in% filled_enough$Hylak_id) 
 
-
+#How many lakes? 
+length(unique(co_full$Hylak_id))
 
 save(co_full, file = 'data/color_summary.RData')
 ```
@@ -116,13 +117,18 @@ load('data/nhd_lakes.RData')
 load('data/glcp_sub.RData')
 
 nhd_hylak <- nhd_hylak %>%
-  filter(elevation > 1000) %>% ## IAO -- do we want to change this to 1400 as in 2_GreenBlueMedians.Rmd? 
+  filter(elevation >= 1400) %>% ## changed to have the same cut off as in 2_GreenBlueMedians.Rmd? 
   filter(ftype %in% c('LakePond','Reservoir')) 
 
 actually_high_lakes <- nhd_hylak
 
+
 high_lakes <- co_full %>%
   filter(Hylak_id %in% actually_high_lakes$Hylak_id)
+
+#How many lakes? 
+length(unique(high_lakes$Hylak_id))
+
 
 map_sens <- function(df){
   sens.slope(df$impute_value)
@@ -253,90 +259,62 @@ legend<-ggplot() +
        title="Forel-Ule\ncolor")
 
 # make prettier
-png(filename = 'figs/dwl_hist.png', width = 4, height = 4,
-    units = 'in', res = 300)
-
-
-base<-ggplot() + 
-  facet_wrap(~decade, ncol = 1) + 
-  geom_rect(data = bg.fui, 
-            aes(xmin = ymin, xmax = ymax, ymin = -5, ymax = 100, fill = color)) + 
-  geom_vline(xintercept = 530, linetype = 3) +
-  geom_histogram(data = high_modes, aes(x=dWL, y = ..density..), fill = NA,
-                 color = 'black', alpha = .3, bins = 40) + 
-  geom_density(data = high_modes, aes(x=dWL)) + 
-  scale_x_continuous(expand = c(0, 0))+ #get rid of whitespace
-  scale_fill_identity() + 
-  theme_few() +
-  coord_cartesian(ylim = c(0,.03))  +
-  labs(x="Dominant wavelength (nm)",
-       y="Density")
-
-base+inset_element(legend, 0.85, 0.75, 1, 1)
-
-layout <- '
-A#
-AB
-A#
-'
-wrap_plots(A = base, B = legend, design = layout)+
-  plot_layout(widths = c(5, 0.5))
-
-
-dev.off()
-
+# png(filename = 'figs/dwl_hist_three_periods.png', width = 4, height = 4,
+#     units = 'in', res = 300)
+# 
+# 
+# base<-ggplot() + 
+#   facet_wrap(~decade, ncol = 1) + 
+#   geom_rect(data = bg.fui, 
+#             aes(xmin = ymin, xmax = ymax, ymin = -5, ymax = 100, fill = color)) + 
+#   geom_vline(xintercept = 530, linetype = 3) +
+#   geom_histogram(data = high_modes, aes(x=dWL, y = ..density..), fill = NA,
+#                  color = 'black', alpha = .3, bins = 40) + 
+#   geom_density(data = high_modes, aes(x=dWL)) + 
+#   scale_x_continuous(expand = c(0, 0))+ #get rid of whitespace
+#   scale_fill_identity() + 
+#   theme_few() +
+#   coord_cartesian(ylim = c(0,.03))  +
+#   labs(x="Dominant wavelength (nm)",
+#        y="Density")
+# 
+# base+inset_element(legend, 0.85, 0.75, 1, 1)
+# 
+# layout <- '
+# A#
+# AB
+# A#
+# '
+# wrap_plots(A = base, B = legend, design = layout)+
+#   plot_layout(widths = c(5, 0.5))
+# 
+# 
+# dev.off()
 
 
 
 
 
 ```
-
-
-
-
-
-
-
-```{r}
-##IAO - not sure what's happening here -- 
-ggplot(high_modes, aes(x= mean_monthly_precip_mm, y = dWL,
-                       color = mean_annual_temp_k)) + 
-  geom_point() + 
-  facet_wrap(~decade) + 
-  scale_x_log10()
-
-
-
-```
-
-
 
 
 ## DWL Trends
+
 ```{r}
-dWL_trends <- trend_plotter()
+# dWL_trends <- trend_plotter()
 
 ##IAO-- this is cool but I think we will want to only look at median.
 #Or if we want to look at max, maybe filter down to only sites with >3 observations a year?
 
 # png(filename = 'figs/dwl_hist.png', width = 4,
 #     height = , units = 'in', res = 300)
-dWL_trends[[2]]
+# dWL_trends[[2]]
 # dev.off()
 
-```
-
-
-## DWL why?
-
-```{r}
-
+## Pull data for plotting
 
 dwl <- dWL_trends[[1]] %>%
-  inner_join(nhd_hylak, by = 'Hylak_id') 
-
-
+  inner_join(nhd_hylak, by = 'Hylak_id')
 
 dwl_all <- dwl %>%
   filter(stat == 'median') %>%
@@ -364,26 +342,106 @@ trend_labels<-dwl_all %>%
          perc=round(perc,0)) 
 
 #Export
-png(filename = 'figs/Trend Examples.png',
-    width = 6,
-    height = 4,
+png(filename = 'figs/Trend Examples 2.png',
+    width = 5,
+    height = 8,
     res = 600,
     units = 'in')
-ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) + 
+ggplot(dwl_all, aes(x = year, y = value, fill=Trend, colr=Trend, group = Hylak_id)) +
   geom_smooth(method = 'lm',
               se = FALSE,
-              col = 'gray',
-              alpha = 0.1) + 
+              col = 'grey50',
+              alpha=0.5,
+              size=0.1) + 
   geom_point(data = full_spec, shape=21) + 
-  geom_smooth(data = full_spec, color = 'black',
+  geom_smooth(data = full_spec, aes(color=Trend),
+              # color = 'black',
               method = 'lm',
               se = FALSE) + 
-  geom_text(x = 1990, y = 585, aes(group=Trend, label = paste("n =",n)), data = trend_labels)+ #Add label for sample size
-  facet_wrap(~Trend) + 
+  scale_fill_manual(values = c('gray20','#a6cee3','#1f78b4','#33a02c','#b2df8a'),
+                       name = '') + 
+  scale_color_manual(values = c('#a6cee3','#1f78b4','#33a02c','#b2df8a'),
+                       name = '') + 
+  geom_text(x = 1990, y = 585,
+            aes(group=Trend, label = paste("n =",n)),
+            data = trend_labels, size=3)+ #Add label for sample size
+  scale_x_continuous(breaks=seq(1986, 2018, 6))+
+  facet_wrap(~Trend, nrow=5) + 
   theme_few()+
+  theme(legend.position="none",
+        plot.margin = unit(c(0,0.2,0,0), "cm"),)+
   labs(y="Dominant wavelength (nm)",
-       x="Year")
+       x="Year") +
+
+ggplot(dwl_all,aes(x=slope,color=Trend)) + 
+  geom_freqpoly(bins = 20, size = 1) + 
+  geom_vline(xintercept=0, linetype="dashed", size=0.5)+
+  facet_wrap(~Trend, nrow=5, scales="free_y") +
+  theme_few() + 
+  scale_y_continuous(position="right")+
+  scale_x_continuous(breaks=seq(-1.5, 1.5, 1))+
+  theme(legend.position="none",
+        plot.margin = unit(c(0,0,0,0.2), "cm"),
+      # legend.position = 'top',
+          legend.direction = 'horizontal') +
+    # guides(color=guide_legend(nrow=2, byrow=TRUE)) + 
+  scale_color_manual(values =  c('gray20','#a6cee3','#1f78b4','#33a02c','#b2df8a'),
+                       name = '') + 
+  xlab("Slope")+
+  ylab('Lake count')
 dev.off()
+
+```
+
+#### Get lat/long for PRISM
+```{r}
+#Extract lat/long for PRISM
+dwl_all_ungrouped<-dwl_all%>%ungroup()%>%select(Hylak_id, geometry) 
+
+separated_coord <- dwl_all_ungrouped %>%
+    mutate(lat = unlist(map(dwl_all_ungrouped$geometry,2)),
+           long = unlist(map(dwl_all_ungrouped$geometry,1))) %>%
+  select(-geometry) %>%
+  distinct() %>%
+  relocate(Hylak_id, .after = last_col())
+
+#PRISM can only pull 500 sites at a time, so split into two dataframes
+separated_coord_1<-separated_coord %>%
+  slice(1:500)
+separated_coord_2<-separated_coord %>%
+  slice(501:nrow(.))
+# write_csv(separated_coord_1, "data/prism/separated_coord_1.csv", col_names = FALSE)
+# write_csv(separated_coord_2, "data/prism/separated_coord_2.csv",col_names = FALSE)
+# Use the above .csv files to download PRISM data for each individual lakes
+# https://prism.oregonstate.edu/explorer/bulk.php 
+
+#Read in PRISM data
+dir<-here("data/prism/download")
+files<-list.files(dir)
+prism<-data.frame() # data frame to store all prism data
+for(i in 1:length(files)){ # loops over all files in prism/download directory
+  cur<-read.table(file.path(dir,paste(files[i],sep='')),
+                  header=T,sep=",",skip=10,
+                  stringsAsFactors = F) # read in all prism files
+  cur$fileName<-files[i]
+  #keep track of which .csv file data came from to make sure it's all there
+  prism<-rbind(prism,cur)
+}
+prism<-prism %>%
+    rename(ppt_mm=`ppt..mm.`,
+           tmean_degC=`tmean..degrees.C.`,
+           elev_m_prism=`Elevation..m.`,
+           Hylak_id=Name,
+           lon_dec_deg=Longitude,
+           lat_dec_deg=Latitude,
+           date=Date)%>%
+  mutate(date=ym(date)) 
+  # select(-fileName)
+length(unique(prism$fileName))
+
+str(prism)
+#Double check to make sure all data are there
+
 ```
 
 
@@ -424,75 +482,5 @@ dev.off()
 
 ```
 
-## Why DWL
 
-
-```{r}
-
-
-
-```
-
-
-## Nir trends
-
-DWL is a human eye color. So it has no information from the Nir band. Nir can increase with sediment, algae, and other constituents. 
-
-```{r, eval = F}
-nir_trends <- trend_plotter('Nir',
-                            'Trend in Nir reflectance')
-
-png(filename = 'figs/nir_hist.png', width = 6,
-    height = 4, units = 'in', res = 300)
-nir_trends[[2]]
-dev.off()
-
-```
-
-
-
-```{r}
-trend_lakes <- co_lakes %>%
-  inner_join(dWL_trends[[1]] %>% 
-               filter(stat == 'median') %>%
-               select(Hylak_id, Trend, slope,plots)) 
-  
-
-
-plot_list <- as.list(trend_lakes$plots)
-
-library(leafpop)
-m1 <- mapview(trend_lakes,
-        zcol='Trend',
-        popup = leafpop::popupGraph(plot_list))
-
-m1
-mapshot(m1, url = 'interactive_map.html',
-        selfcontained = F)
-
-```
-
-
-
-
-
-```{r}
-ht <- co_summary %>%
-  filter(Hylak_id == '112043') %>%
-  filter(var == 'dWL')
-
-ggplot(ht,aes(x=year,y=value)) + 
-  geom_point() + 
-  facet_wrap(~stat, scales = 'free_y')
-
-str()
-ggplot(trend_lakes,aes(x=elevation,
-                       y = slope)) + 
-  geom_point()
-
-mod <- lm(slope ~ elevation, data = trend_lakes)
-
-summary(mod)
-```
-
-
+## DWL Trends -- why?
