@@ -33,6 +33,8 @@ library(yardstick)
 library(rpart.plot)
 library(patchwork)
 library(cowplot)
+library(lfstat) #for water_year function
+library(zyp) #for zyp::zyp.sen, getting intercept for plotting sens slopes
 
 
 sf_use_s2(use_s2 = T)
@@ -103,8 +105,199 @@ save(co_full, file = 'data/color_summary.RData')
 ```
 
 
+## PRISM
+
+#### Get lat/long for PRISM
+```{r}
+#Extract lat/long for PRISM
+dwl_all_ungrouped<-dwl_all%>%ungroup()%>%select(Hylak_id, geometry) 
+
+separated_coord <- dwl_all_ungrouped %>%
+    mutate(lat = unlist(map(dwl_all_ungrouped$geometry,2)),
+           long = unlist(map(dwl_all_ungrouped$geometry,1))) %>%
+  select(-geometry) %>%
+  distinct() %>%
+  relocate(Hylak_id, .after = last_col())
+
+#PRISM can only pull 500 sites at a time, so split into two dataframes
+separated_coord_1<-separated_coord %>%
+  slice(1:500)
+separated_coord_2<-separated_coord %>%
+  slice(501:nrow(.))
+# write_csv(separated_coord_1, "data/prism/separated_coord_1.csv", col_names = FALSE)
+# write_csv(separated_coord_2, "data/prism/separated_coord_2.csv",col_names = FALSE)
+# Use the above .csv files to download PRISM data for each individual lakes
+# https://prism.oregonstate.edu/explorer/bulk.php 
+
+#Read in PRISM data
+dir<-here("data/prism/download")
+files<-list.files(dir)
+prism<-data.frame() # data frame to store all prism data
+for(i in 1:length(files)){ # loops over all files in prism/download directory
+  cur<-read.table(file.path(dir,paste(files[i],sep='')),
+                  header=T,sep=",",skip=10,
+                  stringsAsFactors = F) # read in all prism files
+  cur$fileName<-files[i]
+  #keep track of which .csv file data came from to make sure it's all there
+  prism<-rbind(prism,cur)
+}
+prism<-prism %>%
+    rename(ppt_mm=`ppt..mm.`,
+           tmean_degC=`tmean..degrees.C.`,
+           elev_m_prism=`Elevation..m.`,
+           Hylak_id=Name,
+           lon_dec_deg=Longitude,
+           lat_dec_deg=Latitude,
+           date=Date)%>%
+  mutate(date=ym(date)) 
+  # select(-fileName)
+
+# Double check that all files joined
+# length(unique(prism$fileName))
+
+#Double check to make sure all data are there
+str(prism)
 
 
+```
+
+### Summary stats
+```{r}
+
+
+# Summary statistics by site
+prism_sum <- prism %>%
+  select(-c(lat_dec_deg,lon_dec_deg,elev_m_prism,fileName)) %>%
+  pivot_longer(-c(Hylak_id, date)) %>%
+  mutate(year=year(date),
+         water_year=water_year(date, "usgs"), #uses the USGS standard of Oct 
+         month=month(date),
+         season = case_when(year==water_year & month %in% c(3,4,5) ~ "spring",
+                           year==water_year & month %in% c(6,7,8) ~ "summer",
+                           year==water_year & month %in% c(1,2) ~ "winter",
+                           year!=water_year & month %in% c(12) ~ "winter"),
+         Hylak_id=as.factor(as.integer(Hylak_id)),
+         water_year=as.numeric(as.character(water_year))) %>%
+  drop_na(season)%>%
+  group_by(Hylak_id, water_year, season, name) %>%
+  summarize(mean=mean(value, na.rm=TRUE))
+
+prism_sum_ppt<-prism_sum %>%
+  filter(name=="ppt_mm")
+prism_sum_temp<-prism_sum %>%
+  filter(name=="tmean_degC")
+
+##########################################################################################
+##Functions for calculating sens slopes and intercepts for plotting later
+##########################################################################################
+map_sens2 <- function(df){
+  sens.slope(df$mean)
+}
+
+
+sens_slope <- function(mod){
+  mod$estimate
+}
+
+#https://kevintshoemaker.github.io/NRES-746/TimeSeries_all.html
+#For getting sens intercept, helpful for plotting later
+map_zyp <- function(df){
+  zyp::zyp.sen(mean~water_year,df)
+  # sens.slope(df$mean)
+}
+
+
+sens_intercept <- function(mod){
+  mod$coefficients[[1]] # pull out y-int estimate for ploting
+}
+
+
+#Coefficient of variation -- how variation is temp and precip over time? 
+cv <- function(df)  {
+  sd(df$mean)/mean(df$mean)
+}
+
+## Precipitation first--- 
+## Only keeping these separate for the trend categories.
+prism_sum_ppt_nested<-prism_sum_ppt %>%
+    group_by(Hylak_id, season, name) %>%
+    nest() %>%
+    mutate(sens = map(data, map_sens2),
+           sens_sum = map(sens,broom::glance),
+           slope = map(sens,sens_slope),
+           zyp_mod = map(data,map_zyp),
+           cv = map(data,cv),
+           intercept = map(zyp_mod,sens_intercept))
+
+prism_sum_temp_nested<-prism_sum_temp %>%
+    group_by(Hylak_id, season, name) %>%
+    nest() %>%
+    mutate(sens = map(data, map_sens2),
+           sens_sum = map(sens,broom::glance),
+           slope = map(sens,sens_slope),
+           zyp_mod = map(data,map_zyp),
+           intercept = map(zyp_mod,sens_intercept))
+
+## Un-nest PPT
+prism_sum_ppt_unnested = unnest(prism_sum_ppt_nested, c(sens_sum,slope, season, name))%>%
+    mutate(Trend = case_when(p.value <= 0.05 & slope >= 0 ~ 'wetter',
+                             p.value <= 0.05 & slope <= 0 ~ 'drier',
+                             p.value > 0.05 ~ 'No trend'),
+           Trend = factor(Trend, 
+                          levels = c('No trend',
+                                      'wetter',
+                                     'drier'))) 
+## Un-nest TEMP
+prism_sum_temp_unnested = unnest(prism_sum_temp_nested, c(sens_sum,slope, season, name))%>%
+    mutate(Trend = case_when(p.value <= 0.05 & slope >= 0 ~ 'warmer',
+                             p.value <= 0.05 & slope <= 0 ~ 'cooler',
+                             p.value > 0.05 ~ 'No trend'),
+           Trend = factor(Trend, 
+                          levels = c('No trend',
+                                      'warmer',
+                                     'cooler'))) 
+
+#Extract all covariates for modeling...
+prism_ppt_trends_wide<-prism_sum_ppt_unnested %>%
+  select(Hylak_id, season, name, cv, slope)%>%
+  unnest(c(cv, slope)) %>%
+  pivot_wider(names_from=c("season","name"),
+                values_from=c("slope","cv"))
+
+prism_temp_trends_wide<-prism_sum_ppt_unnested %>%
+  select(Hylak_id, season, name, cv, slope) %>%
+  unnest(c(cv, slope)) %>%
+  pivot_wider(names_from=c("season","name"),
+              values_from=c("slope","cv"))
+
+prism_trends_wide<-inner_join(prism_ppt_trends_wide,prism_temp_trends_wide)
+
+```
+
+#### Interrogate trends
+```{r}
+
+#How many lakes are getting wetter/drier in each season?
+prism_sum_ppt_unnested %>%
+  unnest(data) %>%
+  ungroup() %>%
+  mutate(n_lakes_total=length(unique(Hylak_id))) %>%
+  group_by(Trend, season, n_lakes_total) %>%
+  summarize(n_trending=length(unique(Hylak_id))) %>%
+  mutate(perc=(n_trending/sum(n_lakes_total))*100,
+         perc=round(perc,1)) 
+
+#How many lakes are getting warmer/cooler in each season?
+prism_sum_temp_unnested %>%
+  unnest(data) %>%
+  ungroup() %>%
+  mutate(n_lakes_total=length(unique(Hylak_id))) %>%
+  group_by(Trend, season, n_lakes_total) %>%
+  summarize(n_trending=length(unique(Hylak_id))) %>%
+  mutate(perc=(n_trending/sum(n_lakes_total))*100,
+         perc=round(perc,1)) 
+
+```
 
 ## Net Trends in DWL
 
@@ -202,11 +395,6 @@ trend_plotter <- function(study_lakes = high_lakes,
   
   return(list(sens_sum, plot))
 }
-
-
-
-
-
 ```
 
 ## DWL modes
@@ -219,7 +407,7 @@ high_lakes_descriptor <- glcp_high_lakes %>%
   group_by(Hylak_id) %>%
   summarize(across(where(is.numeric),mean))
 
-
+ 
 
 high_modes <- high_lakes %>%
   filter(var == 'dWL',
@@ -301,7 +489,7 @@ legend<-ggplot() +
 ## DWL Trends
 
 ```{r}
-# dWL_trends <- trend_plotter()
+dWL_trends <- trend_plotter()
 
 ##IAO-- this is cool but I think we will want to only look at median.
 #Or if we want to look at max, maybe filter down to only sites with >3 observations a year?
@@ -322,7 +510,8 @@ dwl_all <- dwl %>%
 
 
 # set.seed(111)
-set.seed(1)
+# set.seed(1)
+set.seed(999)
 dwl_specials <- dwl_all %>%
   # filter(abs(slope) >= 1 | Trend == 'No trend') %>%
   # filter(p.value < 0.05 | Trend == 'No trend') %>% # Had to change from 0.001 to 0.05 to get a blue->green example lake
@@ -354,10 +543,10 @@ ggplot(dwl_all, aes(x = year, y = value, fill=Trend, colr=Trend, group = Hylak_i
               alpha=0.5,
               size=0.1) + 
   geom_point(data = full_spec, shape=21) + 
-  geom_smooth(data = full_spec, aes(color=Trend),
-              # color = 'black',
-              method = 'lm',
-              se = FALSE) + 
+  # geom_smooth(data = full_spec, aes(color=Trend),
+  #             # color = 'black',
+  #             method = 'lm',
+  #             se = FALSE) + 
   scale_fill_manual(values = c('gray20','#a6cee3','#1f78b4','#33a02c','#b2df8a'),
                        name = '') + 
   scale_color_manual(values = c('#a6cee3','#1f78b4','#33a02c','#b2df8a'),
@@ -388,61 +577,12 @@ ggplot(dwl_all,aes(x=slope,color=Trend)) +
   scale_color_manual(values =  c('gray20','#a6cee3','#1f78b4','#33a02c','#b2df8a'),
                        name = '') + 
   xlab("Slope")+
-  ylab('Lake count')
+  ylab('Lake count') + 
+  plot_layout(widths = c(1, 0.6))
 dev.off()
 
 ```
 
-#### Get lat/long for PRISM
-```{r}
-#Extract lat/long for PRISM
-dwl_all_ungrouped<-dwl_all%>%ungroup()%>%select(Hylak_id, geometry) 
-
-separated_coord <- dwl_all_ungrouped %>%
-    mutate(lat = unlist(map(dwl_all_ungrouped$geometry,2)),
-           long = unlist(map(dwl_all_ungrouped$geometry,1))) %>%
-  select(-geometry) %>%
-  distinct() %>%
-  relocate(Hylak_id, .after = last_col())
-
-#PRISM can only pull 500 sites at a time, so split into two dataframes
-separated_coord_1<-separated_coord %>%
-  slice(1:500)
-separated_coord_2<-separated_coord %>%
-  slice(501:nrow(.))
-# write_csv(separated_coord_1, "data/prism/separated_coord_1.csv", col_names = FALSE)
-# write_csv(separated_coord_2, "data/prism/separated_coord_2.csv",col_names = FALSE)
-# Use the above .csv files to download PRISM data for each individual lakes
-# https://prism.oregonstate.edu/explorer/bulk.php 
-
-#Read in PRISM data
-dir<-here("data/prism/download")
-files<-list.files(dir)
-prism<-data.frame() # data frame to store all prism data
-for(i in 1:length(files)){ # loops over all files in prism/download directory
-  cur<-read.table(file.path(dir,paste(files[i],sep='')),
-                  header=T,sep=",",skip=10,
-                  stringsAsFactors = F) # read in all prism files
-  cur$fileName<-files[i]
-  #keep track of which .csv file data came from to make sure it's all there
-  prism<-rbind(prism,cur)
-}
-prism<-prism %>%
-    rename(ppt_mm=`ppt..mm.`,
-           tmean_degC=`tmean..degrees.C.`,
-           elev_m_prism=`Elevation..m.`,
-           Hylak_id=Name,
-           lon_dec_deg=Longitude,
-           lat_dec_deg=Latitude,
-           date=Date)%>%
-  mutate(date=ym(date)) 
-  # select(-fileName)
-length(unique(prism$fileName))
-
-str(prism)
-#Double check to make sure all data are there
-
-```
 
 
 ## DWL map
@@ -484,3 +624,7 @@ dev.off()
 
 
 ## DWL Trends -- why?
+```{r}
+
+
+```
