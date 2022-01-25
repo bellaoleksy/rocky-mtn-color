@@ -176,7 +176,7 @@ prism_sum <- prism %>%
                            year==water_year & month %in% c(6,7,8) ~ "summer",
                            year==water_year & month %in% c(1,2) ~ "winter",
                            year!=water_year & month %in% c(12) ~ "winter"),
-         Hylak_id=as.factor(as.integer(Hylak_id)),
+         # Hylak_id=as.factor(as.integer(Hylak_id)),
          water_year=as.numeric(as.character(water_year))) %>%
   drop_na(season)%>%
   group_by(Hylak_id, water_year, season, name) %>%
@@ -214,7 +214,7 @@ sens_intercept <- function(mod){
 
 #Coefficient of variation -- how variation is temp and precip over time? 
 cv <- function(df)  {
-  sd(df$mean)/mean(df$mean)
+  abs(sd(df$mean)/mean(df$mean))
 }
 
 ## Precipitation first--- 
@@ -236,6 +236,7 @@ prism_sum_temp_nested<-prism_sum_temp %>%
            sens_sum = map(sens,broom::glance),
            slope = map(sens,sens_slope),
            zyp_mod = map(data,map_zyp),
+           cv = map(data,cv),
            intercept = map(zyp_mod,sens_intercept))
 
 ## Un-nest PPT
@@ -264,7 +265,7 @@ prism_ppt_trends_wide<-prism_sum_ppt_unnested %>%
   pivot_wider(names_from=c("season","name"),
                 values_from=c("slope","cv"))
 
-prism_temp_trends_wide<-prism_sum_ppt_unnested %>%
+prism_temp_trends_wide<-prism_sum_temp_unnested %>%
   select(Hylak_id, season, name, cv, slope) %>%
   unnest(c(cv, slope)) %>%
   pivot_wider(names_from=c("season","name"),
@@ -299,6 +300,8 @@ prism_sum_temp_unnested %>%
 
 ```
 
+## Human populations trends
+
 ## Net Trends in DWL
 
 
@@ -328,6 +331,16 @@ map_sens <- function(df){
 }
 
 
+#https://kevintshoemaker.github.io/NRES-746/TimeSeries_all.html
+#For getting sens intercept, helpful for plotting later
+map_zyp <- function(df){
+  zyp::zyp.sen(impute_value~year,df)
+}
+
+
+sens_intercept <- function(mod){
+  mod$coefficients[[1]] # pull out y-int estimate for ploting
+}
 
 
 sens_est <- function(mod){
@@ -338,7 +351,7 @@ val_mean <- function(df){
   early_mean <- df %>%
     filter(year < 2005) %>%
     pull(impute_value) %>%
-    mean(., na.rm = T)
+    mean(., na.rm = T) 
 }
 
 trend_plotter <- function(study_lakes = high_lakes,
@@ -362,12 +375,18 @@ trend_plotter <- function(study_lakes = high_lakes,
            plots = map(data, trend_plot),
            sens_sum = map(sens,broom::glance),
            slope = map(sens,sens_est),
+           zyp_mod = map(data,map_zyp),
+           intercept = map(zyp_mod,sens_intercept),
            early_mean = map(data, val_mean))
+  
+  
+            
+           
   
   
   sens_sum = unnest(co_mods, c(sens_sum,slope, early_mean)) %>%
     mutate(Trend = case_when(p.value <= 0.05 & slope >= 0 & early_mean < 530 ~ 'Blue -> Green',
-                             p.value <= 0.05 & slope >= 0 & early_mean > 530 ~ 'Intensifying Green',
+                             p.value <= 0.05 & slope >= 0 & early_mean >= 530 ~ 'Intensifying Green/Yellow', #Added >= instead of > IAO 2022-01-25
                              p.value <= 0.05 & slope <= 0 & early_mean > 530 ~ 'Green -> Blue',
                              p.value <= 0.05 & slope <= 0 & early_mean < 530 ~ 'Intensifying Blue',
                              p.value > 0.05 ~ 'No trend'),
@@ -375,7 +394,7 @@ trend_plotter <- function(study_lakes = high_lakes,
                           levels = c('No trend',
                                       'Intensifying Blue',
                                      'Green -> Blue',
-                                     'Intensifying Green',
+                                     'Intensifying Green/Yellow',
                                      'Blue -> Green')))
   
 
@@ -506,7 +525,8 @@ dwl <- dWL_trends[[1]] %>%
 
 dwl_all <- dwl %>%
   filter(stat == 'median') %>%
-  unnest(data)
+  unnest(data) %>%
+  unnest(intercept)
 
 
 # set.seed(111)
@@ -530,29 +550,31 @@ trend_labels<-dwl_all %>%
   mutate(perc=(n/sum(n))*100,
          perc=round(perc,0)) 
 
+
+trendColors <- c('No trend'='grey90',
+                'Intensifying Blue'='#1f78b4',
+                'Green -> Blue'='#a6cee3',
+                'Intensifying Green/Yellow'='#33a02c',
+                'Blue -> Green'='#b2df8a')
+
+
 #Export
 png(filename = 'figs/Trend Examples 2.png',
     width = 5,
     height = 8,
     res = 600,
     units = 'in')
-ggplot(dwl_all, aes(x = year, y = value, fill=Trend, colr=Trend, group = Hylak_id)) +
-  geom_smooth(method = 'lm',
-              se = FALSE,
-              col = 'grey50',
-              alpha=0.5,
-              size=0.1) + 
-  geom_point(data = full_spec, shape=21) + 
-  # geom_smooth(data = full_spec, aes(color=Trend),
-  #             # color = 'black',
-  #             method = 'lm',
-  #             se = FALSE) + 
-  scale_fill_manual(values = c('gray20','#a6cee3','#1f78b4','#33a02c','#b2df8a'),
-                       name = '') + 
-  scale_color_manual(values = c('#a6cee3','#1f78b4','#33a02c','#b2df8a'),
-                       name = '') + 
+ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
+  geom_abline(aes(intercept = intercept, slope = slope), color="grey50", size=0.1, alpha=0.5) + #background Sen's slopes
+  geom_abline(data = full_spec, 
+              aes(intercept = intercept, slope = slope, color=Trend),
+              size=1) + #Sen's slope for selected sites
+  geom_point(data = full_spec, aes(fill=Trend), shape=21) + 
+  scale_fill_manual(values=trendColors)+
+  scale_color_manual(values=trendColors)+
   geom_text(x = 1990, y = 585,
             aes(group=Trend, label = paste("n =",n)),
+            color="black",
             data = trend_labels, size=3)+ #Add label for sample size
   scale_x_continuous(breaks=seq(1986, 2018, 6))+
   facet_wrap(~Trend, nrow=5) + 
@@ -561,8 +583,8 @@ ggplot(dwl_all, aes(x = year, y = value, fill=Trend, colr=Trend, group = Hylak_i
         plot.margin = unit(c(0,0.2,0,0), "cm"),)+
   labs(y="Dominant wavelength (nm)",
        x="Year") +
-
-ggplot(dwl_all,aes(x=slope,color=Trend)) + 
+  
+  ggplot(dwl_all,aes(x=slope,color=Trend)) + 
   geom_freqpoly(bins = 20, size = 1) + 
   geom_vline(xintercept=0, linetype="dashed", size=0.5)+
   facet_wrap(~Trend, nrow=5, scales="free_y") +
@@ -571,11 +593,9 @@ ggplot(dwl_all,aes(x=slope,color=Trend)) +
   scale_x_continuous(breaks=seq(-1.5, 1.5, 1))+
   theme(legend.position="none",
         plot.margin = unit(c(0,0,0,0.2), "cm"),
-      # legend.position = 'top',
-          legend.direction = 'horizontal') +
-    # guides(color=guide_legend(nrow=2, byrow=TRUE)) + 
-  scale_color_manual(values =  c('gray20','#a6cee3','#1f78b4','#33a02c','#b2df8a'),
-                       name = '') + 
+        strip.text.x = element_text(color="white"), #Keep strips but color white so they are invisible
+        legend.direction = 'horizontal') +
+  scale_color_manual(values=trendColors)+
   xlab("Slope")+
   ylab('Lake count') + 
   plot_layout(widths = c(1, 0.6))
@@ -591,8 +611,7 @@ dev.off()
 
 class(definitely_lakes)
 dwl_map <- dwl %>%
-  filter(stat == 'median',
-         Hylak_id %in% nhd_hylak_blue_mod$Hylak_id) %>%
+  filter(stat == 'median') %>%
   dplyr::select(Hylak_id,Trend) %>%
   inner_join(site_cols,.) %>%
   arrange(Trend)
@@ -610,21 +629,183 @@ tm_shape(ras) +
             title = 'Elevation (m)',
             palette = 'Greys',
             legend.show = F) + 
-  tm_shape(dwl_map) + 
-  tm_dots(title = '',size = .2,
+tm_shape(states) + 
+  tm_borders(lwd = 1,
+             col = 'black') + 
+tm_shape(dwl_map) + 
+    tm_bubbles(size = .05,
              col = 'Trend',
-          shape = 16,
-          palette = c('gray20','#1f78b4','#a6cee3','#b2df8a','#33a02c')) + 
-  tm_legend(legend.position = c(0.1,0.08))
-
+             shape=21,
+             border.col = 'black',
+             border.lwd = 1,
+             # jitter = .3,
+             palette = c('gray20','#1f78b4','#a6cee3','#33a02c','#b2df8a')) +
+tm_legend(legend.position = c(0,0),
+            legend.bg.color = 'gray90',
+            legend.frame = 'black') 
 dev.off()
-
-
 ```
 
 
 ## DWL Trends -- why?
 ```{r}
 
+#Create df for CART modeling
+
+trends_df<-dwl_all %>%
+  ungroup()%>%
+  filter(Trend!="No trend") %>%
+  select(Hylak_id, Trend) %>%
+  distinct(Hylak_id,.keep_all = T) %>%
+  inner_join(blue_green_2018) %>% #add LakeCat variables
+  inner_join(prism_trends_wide) %>% #add PRISM variables
+  select(-c(air_temp,precip))
+set.seed(4444)
+
+train_d <- trends_df %>%
+  sample_frac(0.8) 
+
+test_d <- trends_df %>%
+  dplyr::filter(!Hylak_id %in% train_d$Hylak_id) %>%
+  # select(-Hylak_id) %>%
+  mutate_if(is.numeric, round, digits=2) %>%
+  dplyr::select(-Hylak_id,-dWL, -group)
+
+train_d <- train_d %>%
+  # select(-Hylak_id) %>%
+  mutate_if(is.numeric, round, digits=2) %>%
+  dplyr::select(-Hylak_id,-dWL, -group)
+
+
+
+## Not run, but code that helped make decision about complexity parameter
+# prune_mod <-caret::train(
+#   group ~., data = train_d, method = "rpart",
+#   trControl = trainControl("boot", number = 100),
+#   tuneLength = 100
+#   )
+
+
+
+cart_mod <- rpart(Trend ~ ., data = train_d,
+                  method = 'class',
+                  cp = 0.03) # CP is a tuning knob for tree complexity.
+
+
+
+test_d$guess <- predict(cart_mod, test_d, 'class')
+cm <- conf_mat(test_d, Trend,guess)
+accuracy(test_d,Trend,guess)
+
+# png(filename = 'figs/bg_tree.png',
+# width = 7, height = 8, units = 'in', res = 300)
+rpart.plot(cart_mod,
+           type = 2, #2=split labels below node labels; but I like the look of 4 with labels on both connecting lines and no "yesno"
+           extra = 2,#2 = class rate; 106 = prob. of 2nd class + percent of observations
+           under = TRUE, #I kind of like the look of this better
+           clip.right.labs = FALSE,
+           branch = 0.3,
+           # branch.type = 5, yesno=FALSE, #If you comment out type=4, I kind of like the look of this
+           branch.col = "gray",
+           # main="Factors that influence lake category",
+           box.palette = list('#1f78b4','#a6cee3','#33a02c','#b2df8a'))
+# dev.off()
+
+## Create manually because the plot_confusion_matrix function is pissing me off
+conf_mat <- confusion_matrix(targets = test_d$Trend,
+                             predictions = test_d$guess)
+table<-data.frame(conf_mat$`Confusion Matrix`)
+
+plotTable <- table %>%
+  group_by(Target) %>%
+  mutate(prop = N/sum(N),
+         prop = round(prop,2))
+
+# png(filename = 'figs/bg_confusion_matrix_gg.png',
+#     width = 6, height = 5,
+#     units = 'in', res = 300)
+ggplot(data = plotTable,
+       mapping = aes(x = Target, y = Prediction)) +
+  # geom_tile(aes(fill=Pos_Blue.clear), color="black") +
+  # scale_x_discrete(expand = c(0, 0))+ #remove white space
+  # scale_y_discrete(expand = c(0, 0))+ #remove white space
+  geom_text(aes(label = paste0("n=",N)), vjust = .5,  alpha = 1, size=4) +
+  geom_text(aes(label = paste0("prop.=",prop)), vjust = 2.0,  alpha = 1, size=3) +
+  scale_fill_manual(values = c(TP = "#1f78b4", TN = "#33a02c",
+                               FN = "white" , FP ="white")) +
+  theme_few() +
+  # xlim(rev(levels(table$Target)))+
+  theme(legend.position="none")
+# dev.off()
+
+
+
+##GGPARTY? Another way
+library(ggparty)
+cart_mod_party<-as.party(cart_mod)
+# plot(cart_mod_party)
+ggparty(cart_mod_party) +
+  geom_edge(size=1, color="grey50") +
+    # geom_node_label(aes(label = splitvar), ids = "inner") +
+  geom_edge_label() +
+  geom_node_splitvar() +
+  geom_node_plot(gglist = list(geom_bar(aes(x = "", fill = Trend),
+                                    position = position_fill()),#standardizes so each stack has constant height; plots proportions.
+                               (scale_fill_manual(values=trendColors)),
+                                                               (theme_few()),
+                               (theme(plot.margin = unit(c(0,0.2,0,0.2), "cm"),
+                                axis.title.x=element_blank(),
+                                axis.text.x=element_blank(),
+                                axis.ticks.x=element_blank(),
+                                legend.position="none")),
+                               (scale_x_discrete(expand = c(0, 0))), #remove white space
+                               # (scale_y_discrete(expand = c(0, 0))), #remove white space)
+                               ylab("Proportion")),
+                               shared_axis_labels = TRUE) +
+  theme(plot.margin = unit(c(0,0,0,0), "cm"))
+
+## "Your decision tree may be cool, but what if I tell you you can make it hot?" LMAO.
+# https://trang1618.github.io/treeheatr/articles/explore.html
+# library(treeheatr)
+# 
+# # build tree using rpart:
+# x <- partykit::as.party(cart_mod)
+# 
+# tree_plot<-heat_tree(x,
+#           target_lab = 'group',
+#           target_cols = c('#1f78b4','#33a02c'),
+#           feats = NA, 
+#           # feats = c('slope', 'maxdepth', 'WALA', 'air_temp'), #select only features on the tree
+#           # show = 'tree-only',
+#           # cont_legend = TRUE, cate_legend = TRUE,
+#           panel_space = 0.05, target_space = 0.2, tree_space_bottom = 0.1, heat_rel_height = 0.1,
+#           edge_vars = list(size = 1, color = 'grey'))
+# tree_plot
+
+
+#Combine
+library(patchwork)
+# (tree_plot + conf_matrix_plot + spatial_hist )+
+#   plot_layout(ncol = 1) 
+# 
+# spatial_hist / (tree_plot + conf_matrix_plot + plot_layout(widths = c(1,0.5))) + 
+#   plot_layout(heights = c(0.5,1.5))
+
+##Arrangement 1
+png(filename = 'figs/spatial_plots.png',
+width = 6, height = 7, units = 'in', res = 600)
+C<-(spatial_hist+conf_matrix_plot)
+(C/tree_plot)+ plot_layout(heights = c(0.3,1))+  plot_annotation(tag_levels = 'A')
+#For top right alginment: inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) 
+dev.off()
+
+##Arrangement 2
+B <- spatial_hist / conf_matrix_plot +   plot_layout(heights = c(2,1))
+tree_plot + B  +   plot_layout(widths = c(2,1)) +  plot_annotation(tag_levels = 'A')
+
+##Arrangement 3
+(spatial_hist / tree_plot + inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) +
+   plot_layout(heights = c(0.5,1.5))+
+   plot_annotation(tag_levels = list(c('A', 'B'), '1'))
 
 ```
