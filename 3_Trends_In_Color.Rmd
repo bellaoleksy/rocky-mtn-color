@@ -241,19 +241,19 @@ prism_sum_temp_nested<-prism_sum_temp %>%
 
 ## Un-nest PPT
 prism_sum_ppt_unnested = unnest(prism_sum_ppt_nested, c(sens_sum,slope, season, name))%>%
-    mutate(Trend = case_when(p.value <= 0.05 & slope >= 0 ~ 'wetter',
+    mutate(Trend_ppt = case_when(p.value <= 0.05 & slope >= 0 ~ 'wetter',
                              p.value <= 0.05 & slope <= 0 ~ 'drier',
                              p.value > 0.05 ~ 'No trend'),
-           Trend = factor(Trend, 
+           Trend_ppt = factor(Trend_ppt, 
                           levels = c('No trend',
                                       'wetter',
                                      'drier'))) 
 ## Un-nest TEMP
 prism_sum_temp_unnested = unnest(prism_sum_temp_nested, c(sens_sum,slope, season, name))%>%
-    mutate(Trend = case_when(p.value <= 0.05 & slope >= 0 ~ 'warmer',
+    mutate(Trend_temp = case_when(p.value <= 0.05 & slope >= 0 ~ 'warmer',
                              p.value <= 0.05 & slope <= 0 ~ 'cooler',
                              p.value > 0.05 ~ 'No trend'),
-           Trend = factor(Trend, 
+           Trend_temp = factor(Trend_temp, 
                           levels = c('No trend',
                                       'warmer',
                                      'cooler'))) 
@@ -271,8 +271,26 @@ prism_temp_trends_wide<-prism_sum_temp_unnested %>%
   pivot_wider(names_from=c("season","name"),
               values_from=c("slope","cv"))
 
+
+##Dataframe with all the actual slopes and cv values
 prism_trends_wide<-inner_join(prism_ppt_trends_wide,prism_temp_trends_wide)
 
+##Data with all the ppt and temp trend categories
+ppt_trend_categories<-prism_sum_ppt_unnested%>%
+  select(Hylak_id,Trend_ppt) %>%
+  pivot_wider(names_from=c("season"),
+              values_from=c("Trend_ppt"),
+              names_prefix="ppt_trend_") %>%
+  ungroup()%>%
+  select(-name)
+temp_trend_categories<-prism_sum_temp_unnested%>%
+  select(Hylak_id,Trend_temp) %>%
+  pivot_wider(names_from=c("season"),
+              values_from=c("Trend_temp"),
+              names_prefix="temp_trend_") %>%
+  ungroup()%>%
+  select(-name)
+prism_trend_categories<-inner_join(ppt_trend_categories,temp_trend_categories)
 ```
 
 #### Interrogate trends
@@ -301,6 +319,18 @@ prism_sum_temp_unnested %>%
 ```
 
 ## Human populations trends
+```{r}
+population_trends<-  glcp_high_lakes %>%
+  select(Hylak_id, year,pop_sum) %>%
+  drop_na() %>%
+  pivot_wider(names_from="year",
+              values_from="pop_sum",
+              names_prefix="pop_year_") %>%
+  group_by(Hylak_id) %>%
+  summarize(population_change=((pop_year_2015-pop_year_1995)/pop_year_1995)*100)
+
+```
+
 
 ## Net Trends in DWL
 
@@ -559,7 +589,7 @@ trendColors <- c('No trend'='grey90',
 
 
 #Export
-png(filename = 'figs/Trend Examples 2.png',
+png(filename = 'figs/Trend Examples.png',
     width = 5,
     height = 8,
     res = 600,
@@ -584,7 +614,8 @@ ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
   labs(y="Dominant wavelength (nm)",
        x="Year") +
   
-  ggplot(dwl_all,aes(x=slope,color=Trend)) + 
+  ggplot(dwl_all %>%
+             distinct(Hylak_id,.keep_all = T),aes(x=slope,color=Trend)) + 
   geom_freqpoly(bins = 20, size = 1) + 
   geom_vline(xintercept=0, linetype="dashed", size=0.5)+
   facet_wrap(~Trend, nrow=5, scales="free_y") +
@@ -657,9 +688,15 @@ trends_df<-dwl_all %>%
   filter(Trend!="No trend") %>%
   select(Hylak_id, Trend) %>%
   distinct(Hylak_id,.keep_all = T) %>%
-  inner_join(blue_green_2018) %>% #add LakeCat variables
+  # inner_join(blue_green_2018) %>% #add LakeCat variables
   inner_join(prism_trends_wide) %>% #add PRISM variables
-  select(-c(air_temp,precip))
+  inner_join(population_trends) %>% #add GLCP population variables
+  inner_join(prism_trend_categories) %>% #prism trend categories
+  # select(-c(air_temp,precip,pop_sum)) %>%
+  select(-c(contains(c("perc_","cv_"))))
+
+names(trends_df)
+
 set.seed(4444)
 
 train_d <- trends_df %>%
@@ -667,14 +704,14 @@ train_d <- trends_df %>%
 
 test_d <- trends_df %>%
   dplyr::filter(!Hylak_id %in% train_d$Hylak_id) %>%
-  # select(-Hylak_id) %>%
-  mutate_if(is.numeric, round, digits=2) %>%
-  dplyr::select(-Hylak_id,-dWL, -group)
+  select(-Hylak_id) %>%
+  mutate_if(is.numeric, round, digits=2) 
+  # dplyr::select(-Hylak_id,-dWL, -group)
 
 train_d <- train_d %>%
-  # select(-Hylak_id) %>%
-  mutate_if(is.numeric, round, digits=2) %>%
-  dplyr::select(-Hylak_id,-dWL, -group)
+  select(-Hylak_id) %>%
+  mutate_if(is.numeric, round, digits=2) 
+  # dplyr::select(-Hylak_id,-dWL, -group)
 
 
 
