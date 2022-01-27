@@ -367,6 +367,9 @@ spatial_hist<-ggplot() +
 spatial_hist
 dev.off()
 
+blue_green_2018 %>%
+  group_by(group) %>%
+  summarize(n=length(unique(Hylak_id)))
 
 
 
@@ -378,6 +381,9 @@ train_d <- blue_green_2018 %>%
   rename("MAAT °C"=air_temp,
          "mean depth"=meandepth,
          WSA=ws_area)
+#how many lakes in the training dataset?
+# length(unique(train_d$Hylak_id))
+
 
 test_d <- blue_green_2018 %>%
   dplyr::filter(!Hylak_id %in% train_d$Hylak_id) %>%
@@ -487,12 +493,10 @@ conf_matrix_plot
 
 
 
-
-
 ##GGPARTY? Another way
 library(ggparty)
 cart_mod_party<-as.party(cart_mod)
-plot(cart_mod_party)
+# plot(cart_mod_party)
 tree_plot<-ggparty(cart_mod_party) +
   geom_edge(size=1, color="grey50") +
     # geom_node_label(aes(label = splitvar), ids = "inner") +
@@ -502,7 +506,7 @@ tree_plot<-ggparty(cart_mod_party) +
                                     position = position_fill()),#standardizes so each stack has constant height; plots proportions.
                                (scale_fill_manual(values=c('#1f78b4','#33a02c'))),
                                                                (theme_few()),
-                               (theme(plot.margin = unit(c(0,0.2,0,0.2), "cm"),
+                               (theme(plot.margin = unit(c(0.5,0.2,0,0.2), "cm"),
                                 axis.title.x=element_blank(),
                                 axis.text.x=element_blank(),
                                 axis.ticks.x=element_blank(),
@@ -511,7 +515,14 @@ tree_plot<-ggparty(cart_mod_party) +
                                # (scale_y_discrete(expand = c(0, 0))), #remove white space)
                                ylab("Proportion")),
                                shared_axis_labels = TRUE) +
-  theme(plot.margin = unit(c(0,0,0,0), "cm"))
+  geom_node_label(aes(label = paste0("n=", nodesize)),
+                  # fontface = "bold",
+                  ids = "terminal",
+                  size = 4, 
+                  # nudge_y = 0.01,
+                  nudge_x = 0.01)+
+  theme(plot.margin = unit(c(0,0,0,0), "cm")) 
+  # geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 3.2) 
 tree_plot
 
 ## "Your decision tree may be cool, but what if I tell you you can make it hot?" LMAO.
