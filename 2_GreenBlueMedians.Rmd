@@ -704,37 +704,7 @@ summary_table_export <-
 quick_docx(summary_table_export, file = 'figs/Table1.docx')
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```{r, eval=F}
+#Export a few pieces we need for analysis 3.
+save(blue_green_2018,site_cols,hil,ras,states, file = 'data/spatial_data_analysis2.RData')
+```
