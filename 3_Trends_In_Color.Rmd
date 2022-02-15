@@ -36,10 +36,12 @@ library(patchwork)
 library(cowplot)
 library(lfstat) #for water_year function
 library(zyp) #for zyp::zyp.sen, getting intercept for plotting sens slopes
+# install.packages("remotes")
+# remotes::install_github("MilesMcBain/breakerofchains")
+library(breakerofchains)
 
 # Use dplyr select
 select<-dplyr::select
-
 
 sf_use_s2(use_s2 = T)
 knitr::opts_chunk$set(echo = TRUE, warning = F, comment = F, message = F)
@@ -314,6 +316,7 @@ ppt_trend_categories <- prism_sum_ppt_unnested %>%
   ) %>%
   ungroup() %>%
   select(-name)
+
 temp_trend_categories <- prism_sum_temp_unnested %>%
   select(Hylak_id, Trend_temp) %>%
   pivot_wider(
@@ -684,7 +687,54 @@ dev.off()
 
 ```
 
+###~~ Stats for MS
+```{r}
 
+load('data/lakezones.RData')
+
+#How many lakes in each trend category?
+dwl_all %>%
+  group_by(Trend) %>%
+  summarize(n = length(unique(Hylak_id))) %>%
+  mutate(perc = (n / sum(n)) * 100,
+         perc = round(perc, 0)) 
+
+#How many of the intensifying green/yellow or blue->green lakes are reservoirs?
+#How many lakes in each trend category?
+dwl_all %>%  select(Hylak_id, Trend) %>%
+  distinct(Hylak_id, .keep_all = T) %>%
+    inner_join(blue_green_2018) %>% #add LakeCat variables
+  ungroup() %>%
+  group_by(Trend, res) %>%
+  summarize(n = length(unique(Hylak_id))) %>%
+  mutate(perc = (n / sum(n)) * 100,
+         perc = round(perc, 0)) 
+
+#Where are more of the green->blue lakes located?
+dwl_all %>%
+  ungroup() %>%
+  inner_join(lake_descriptor %>% select(lagoslakeid, Hylak_id), by="Hylak_id") %>%
+  inner_join(lakezones %>% select(lagoslakeid, lake_centroidstate), by="lagoslakeid") %>%
+  distinct(Hylak_id,.keep_all = T) %>%
+  group_by(Trend, lake_centroidstate) %>%
+  summarize(n = length(unique(Hylak_id))) %>%
+  mutate(perc = (n / sum(n)) * 100,
+         perc = round(perc, 0)) %>%
+  filter(Trend %in% c("Green -> Blue","Intensifying Blue"))
+
+#What about blue->green
+dwl_all %>%
+  ungroup() %>%
+  inner_join(lake_descriptor %>% select(lagoslakeid, Hylak_id), by="Hylak_id") %>%
+  inner_join(lakezones %>% select(lagoslakeid, lake_centroidstate), by="lagoslakeid") %>%
+  distinct(Hylak_id,.keep_all = T) %>%
+  group_by(Trend, lake_centroidstate, ftype) %>%
+  summarize(n = length(unique(Hylak_id))) %>%
+  mutate(perc = (n / sum(n)) * 100,
+         perc = round(perc, 0)) %>%
+  filter(Trend %in% c("Blue -> Green","Intensifying Green/Yellow"))
+
+```
 
 ## DWL map
 
@@ -715,7 +765,7 @@ tm_shape(states) +
   tm_borders(lwd = 1,
              col = 'black') + 
 tm_shape(dwl_map) + 
-    tm_bubbles(size = .05,
+    tm_bubbles(size = .2,
              col = 'Trend',
              shape=21,
              border.col = 'black',
@@ -725,6 +775,8 @@ tm_shape(dwl_map) +
 tm_legend(legend.position = c(0,0),
             legend.bg.color = 'gray90',
             legend.frame = 'black') 
+dev.off()
+
 ```
 
 ### DWL trend ridges
@@ -790,22 +842,24 @@ dev.off()
 
 trends_df<-dwl_all %>%
   ungroup()%>%
-  filter(Trend!="No trend") %>%
+  # filter(Trend!="No trend") %>%
+  inner_join(lake_descriptor %>% select(lagoslakeid, Hylak_id), by="Hylak_id") %>%
+  inner_join(lakezones %>% select(lagoslakeid, lake_centroidstate, epanutr_zoneid, neon_zoneid), by="lagoslakeid") %>%
   # filter(Trend %in% c("Blue -> Green",
   #                     "Green -> Blue")) %>%
-  select(Hylak_id, Trend) %>%
+  select(Hylak_id, Trend,epanutr_zoneid,neon_zoneid,lake_centroidstate) %>%
   # rename(sens.slope=slope) %>%
-  mutate(Trend_simple=NA) %>%
-    mutate(Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Blue"), 'Intensifying Blue'),
-          Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Green/Yellow"), 'Intensifying Green/Yellow'),
-          Trend_simple = replace(Trend_simple, Trend %in% c("Blue -> Green"), 'Blue -> Green'),
-          Trend_simple = replace(Trend_simple, Trend %in% c("Green -> Blue"), 'Green -> Blue')) %>%
+  # mutate(Trend_simple=NA) %>%
+  #   mutate(Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Blue"), 'Intensifying Blue'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Green/Yellow"), 'Intensifying Green/Yellow'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Blue -> Green"), 'Blue -> Green'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Green -> Blue"), 'Green -> Blue')) %>%
   # mutate(Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Blue","Green -> Blue"), 'Decreasing'),
   #        Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Green/Yellow","Blue -> Green"), 'Increasing')) %>%
   # mutate(Trend_simple = replace(Trend_simple, Trend %in% c("Green -> Blue"), 'Green -> Blue'),
          # Trend_simple = replace(Trend_simple, Trend %in% c("Blue -> Green"), 'Blue -> Green')) %>%
-  mutate(Trend_simple = as.factor(as.character(Trend_simple))) %>%
-  drop_na(Trend_simple) %>%
+  # mutate(Trend_simple = as.factor(as.character(Trend_simple))) %>%
+  # drop_na(Trend_simple) %>%
   distinct(Hylak_id,.keep_all = T) %>%
   inner_join(blue_green_2018) %>% #add LakeCat variables
   inner_join(prism_trends_wide) %>% #add PRISM variables
@@ -815,15 +869,16 @@ trends_df<-dwl_all %>%
          log10WALA=log10(WALA),
          log10ws_area=log10(ws_area),
          log10pop_sum=log10(pop_sum)) %>%
-  select(-c(dWL,group,Trend,lake_connectivity)) %>%
+  select(-c(dWL,group,lake_connectivity)) %>%
   # mutate(Trend_simple = factor(Trend_simple, 
   #                         levels = c('Intensifying Blue',
   #                                    'Green -> Blue',
   #                                    'Intensifying Green/Yellow',
   #                                    'Blue -> Green'))) %>%
   # # select(-c(population_change,precip, contains("cv_"), contains("slope"), contains("perc_")))%>%
-  select(Hylak_id, Trend_simple, res, log10ws_area, log10WALA, elev, meandepth, slope, log10LSA, log10pop_sum, slope_summer_tmean_degC, perc_barren,
-         slope_winter_ppt_mm, ppt_trend_winter, temp_trend_summer, n_dep)
+  select(Hylak_id, Trend, res, log10ws_area, log10WALA,  elev, meandepth, slope, log10LSA, log10pop_sum, temp_trend_summer,
+         ppt_trend_winter, temp_trend_summer, n_dep, slope_winter_ppt_mm, slope_summer_tmean_degC, lake_centroidstate,
+         perc_urban, perc_forest) #
   # select(-c(air_temp,pop_sum)) %>%
   # select(-c(LSA,WALA,ws_area)) 
   # select(-c(LSA, maxdepth, slope_spring_tmean_degC)) %>% #dropping some highly correlated variables
@@ -831,10 +886,10 @@ trends_df<-dwl_all %>%
 
 names(trends_df)
 # droplevels(trends_df$Trend)
-set.seed(4444)
+set.seed(99)
 
 train_d <- trends_df%>%
-  sample_frac(0.7)
+  sample_frac(0.8)
 
 test_d <- trends_df %>%
   dplyr::filter(!Hylak_id %in% train_d$Hylak_id) %>%
@@ -847,29 +902,29 @@ train_d <- train_d %>%
   mutate_if(is.numeric, round, digits=2) 
   # dplyr::select(-Hylak_id,-dWL, -group)
 
-##First check and see if there are any highly correlated variables. Maybe need to drop?
-# library(GGally)
-# ggpairs(train_d %>%select(where(is.numeric)))
-# ggpairs(train_d %>%select(contains("slope")))
+#Add weights, e.g, give higher weight to smaller class
+positiveWeight = 1.0 / (nrow(subset(train_d, Trend == "No trend")) / nrow(train_d))
+negativeWeight = 1.0 / (nrow(subset(train_d, Trend != "No trend")) / nrow(train_d))
 
+modelWeights <- ifelse(train_d$Trend == "No trend", positiveWeight, negativeWeight)
 
 ## Not run, but code that helped make decision about complexity parameter
 # prune_mod <-caret::train(
-#   Trend_simple ~., data = train_d, method = "rpart",
+#   Trend ~., data = train_d, method = "rpart",
 #   trControl = trainControl("boot", number = 100),
-#   tuneLength = 100
+#   tuneLength = 100,
+#   weights = modelWeights
 #   )
 
 
-
-cart_mod <- rpart(Trend_simple ~ ., data = train_d,
+cart_mod <- rpart(Trend ~ ., data = train_d,
                   method = 'class',
-                  cp = 0.03) # CP is a tuning knob for tree complexity.
-
+                  weights = modelWeights,
+                  cp = 0.05) # CP is a tuning knob for tree complexity.
 
 test_d$guess <- predict(cart_mod, test_d, 'class')
-cm <- conf_mat(test_d, Trend_simple,guess)
-accuracy(test_d,Trend_simple,guess)
+cm <- conf_mat(test_d, Trend,guess)
+accuracy(test_d,Trend,guess)
 
 rpart.plot(cart_mod,
            type = 2, #2=split labels below node labels; but I like the look of 4 with labels on both connecting lines and no "yesno"
@@ -880,14 +935,16 @@ rpart.plot(cart_mod,
            # branch.type = 5, yesno=FALSE, #If you comment out type=4, I kind of like the look of this
            branch.col = "gray",
            # main="Factors that influence lake category",
-           box.palette = list('#1f78b4','#a6cee3','#33a02c','#b2df8a'))
+           box.palette = list('grey50','#1f78b4','#a6cee3','#33a02c','#b2df8a'))
             # box.palette = list('#a6cee3','#b2df8a'))
-hist(log10(trends_df$pop_sum), breaks=50)
+hist(trends_df$log10pop_sum, breaks=50)
 hist(trends_df$slope_spring_tmean_degC, breaks=50)
+hist(trends_df$elev, breaks=50)
+
 
 ## Create manually because the plot_confusion_matrix function is pissing me off
 library(cvms)
-conf_mat <- confusion_matrix(targets = test_d$Trend_simple,
+conf_mat <- confusion_matrix(targets = test_d$Trend,
                              predictions = test_d$guess)
 table<-data.frame(conf_mat$`Confusion Matrix`)
 
@@ -903,7 +960,7 @@ temporal_conf_mat<-ggplot(data = plotTable,
        mapping = aes(x = Target, y = Prediction)) +
   # geom_tile(aes(fill=Pos_Green....Blue), color="black") +
   # geom_tile(aes(fill=Pos_Switch.to.Blue), color="black") +
-    geom_tile(aes(fill=Pos_Decreasing), color="black") +
+    geom_tile(aes(fill=Prediction), color="black") +
   # scale_x_discrete(expand = c(0, 0))+ #remove white space
   # scale_y_discrete(expand = c(0, 0))+ #remove white space
   geom_text(aes(label = paste0("n=",N)), vjust = .5,  alpha = 1, size=4) +
@@ -957,7 +1014,7 @@ temporal_tree_plot<-ggparty(cart_mod_party) +
 temporal_tree_plot
 temporal_tree_plot+inset_element(temporal_conf_mat, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')
 
-
+temporal_tree_plot +temporal_conf_mat + plot_layout(widths = c(0.7,0.3))
 #Combine
 library(patchwork)
 
@@ -978,6 +1035,9 @@ dev.off()
 #    plot_layout(heights = c(0.5,1.5))+
 #    plot_annotation(tag_levels = list(c('A', 'B'), '1'))
 
+
+
+
 ```
 
 #### Random Forest
@@ -985,37 +1045,43 @@ dev.off()
 library(randomForest)
 trends_df<-dwl_all %>%
   ungroup()%>%
-  filter(Trend!="No trend") %>%
-  # filter(Trend %in% c("Blue -> Green",
-  #                     "Green -> Blue")) %>%
+  # filter(Trend!="No trend") %>%
+  inner_join(lake_descriptor %>% select(lagoslakeid, Hylak_id), by="Hylak_id") %>%
+  # inner_join(lakezones %>% select(lagoslakeid, lake_centroidstate, epanutr_zoneid, neon_zoneid), by="lagoslakeid") %>%
   select(Hylak_id, Trend) %>%
   # rename(sens.slope=slope) %>%
-  mutate(Trend_simple=NA) %>%
-    mutate(Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Blue"), 'Intensifying Blue'),
-          Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Green/Yellow"), 'Intensifying Green/Yellow'),
-          Trend_simple = replace(Trend_simple, Trend %in% c("Blue -> Green"), 'Blue -> Green'),
-          Trend_simple = replace(Trend_simple, Trend %in% c("Green -> Blue"), 'Green -> Blue')) %>%
+  # mutate(Trend_simple=NA) %>%
+  #   mutate(Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Blue"), 'Intensifying Blue'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Green/Yellow"), 'Intensifying Green/Yellow'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Blue -> Green"), 'Blue -> Green'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Green -> Blue"), 'Green -> Blue')) %>%
   distinct(Hylak_id,.keep_all = T) %>%
   inner_join(blue_green_2018) %>% #add LakeCat variables
   inner_join(prism_trends_wide) %>% #add PRISM variables
   inner_join(population_trends) %>% #add GLCP population variables
   inner_join(prism_trend_categories) %>%  #prism trend categories
-  select(-Trend) %>%
-  rename(Trend=Trend_simple) %>%
-  mutate(Trend = factor(
-        Trend,
-        levels = c(
-          'Intensifying Blue',
-          'Green -> Blue',
-          'Intensifying Green/Yellow',
-          'Blue -> Green'))) %>%
-  select(-dWL, -group, -precip, -air_temp)
-  # mutate(LSA=log10(LSA),
-  #        WALA=log10(WALA),
-  #        ws_area=log10(ws_area)) %>%
+  select(!contains("cv_")) %>%
+  # select(-Trend) %>%
+  # rename(Trend=Trend_simple) %>%
+  # mutate(Trend = factor(
+  #       Trend,
+  #       levels = c(
+  #         'Intensifying Blue',
+  #         'Green -> Blue',
+  #         'Intensifying Green/Yellow',
+  #         'Blue -> Green'))) %>%
+  select(-dWL, -group, -precip, -air_temp, -area) %>%
+  mutate(perc_agriculture=perc_ag+perc_hay) %>%
+  select(-perc_ag, -perc_hay)
+  # mutate(logLSA=log(LSA),
+  #        logWALA=log(WALA),
+  #        logws_area=log(ws_area),
+  #        logpop_sum=log(pop_sum)) %>%
+  # select(-LSA, -WALA, -ws_area, -pop_sum)
   # select(Hylak_id, Trend, res, WALA, slope, LSA, slope_summer_tmean_degC, perc_barren,
   #        slope_winter_ppt_mm, ppt_trend_winter, temp_trend_summer, no3_dep, nh3_dep)
 set.seed(4444)
+
 
 train_d <- trends_df %>%
   sample_frac(0.8) 
@@ -1023,10 +1089,12 @@ train_d <- trends_df %>%
 test_d <- trends_df %>%
   dplyr::filter(!Hylak_id %in% train_d$Hylak_id) %>%
   select(-Hylak_id) %>%
+    # select(-Hylak_id, -Trend) %>%
   mutate_if(is.numeric, round, digits=3)
 
 train_d <- train_d %>%
   select(-Hylak_id) %>%
+      # select(-Hylak_id,-Trend) %>%
   mutate_if(is.numeric, round, digits=3) 
 
 trControl <- trainControl(method = "cv",
@@ -1034,12 +1102,20 @@ trControl <- trainControl(method = "cv",
     search = "grid")
 
 set.seed(1234)
+
+n.min <- train_d %>%
+  count(Trend) %>%
+  summarize(min=min(n)) %>%
+  pull()
+  
+## Another nice workflow for tuning the model is here: https://www.gmudatamining.com/lesson-13-r-tutorial.html
 # Run the model
 rf_default <- train(Trend~.,
     data = train_d,
     method = "rf",
     metric = "Accuracy",
-    trControl = trControl)
+    trControl = trControl,
+    sampsize = rep(16, 5))
 # Print the results
 print(rf_default)
 
@@ -1053,6 +1129,7 @@ rf_mtry <- train(Trend~.,
     trControl = trControl,
     importance = TRUE,
     nodesize = 14,
+    sampsize = rep(16, 5),
     ntree = 300)
 print(rf_mtry)
 rf_mtry$bestTune$mtry #best value
@@ -1063,7 +1140,7 @@ best_mtry
 
 store_maxnode <- list()
 tuneGrid <- expand.grid(.mtry = best_mtry)
-for (maxnodes in c(5: 15)) {
+for (maxnodes in c(10: 25)) {
     set.seed(1234)
     rf_maxnode <- train(Trend~.,
         data = train_d,
@@ -1073,6 +1150,7 @@ for (maxnodes in c(5: 15)) {
         trControl = trControl,
         importance = TRUE,
         nodesize = 14,
+        sampsize = rep(16, 5),
         maxnodes = maxnodes,
         ntree = 300)
     current_iteration <- toString(maxnodes)
@@ -1092,8 +1170,9 @@ for (ntree in c(250, 300, 350, 400, 450, 500, 550, 600, 800, 1000, 2000)) {
         tuneGrid = tuneGrid,
         trControl = trControl,
         importance = TRUE,
-        nodesize = 14,
-        maxnodes = 20,
+        nodesize = 10,
+        maxnodes = 14,
+        sampsize = rep(16, 5),
         ntree = ntree)
     key <- toString(ntree)
     store_maxtrees[[key]] <- rf_maxtrees
@@ -1109,14 +1188,16 @@ fit_rf <- randomForest(Trend~.,
     tuneGrid = tuneGrid,
     trControl = trControl,
     importance = TRUE,
-    nodesize = 14,
-    ntree = 400,
-    maxnodes = 20)
+    nodesize = 10,
+    ntree = 350,
+    maxnodes = 14,
+    sampsize = rep(16, 5))
 
 # Step 5) Evaluate the model
 
 prediction <-predict(fit_rf, test_d)
-confusionMatrix(prediction, test_d$Trend)
+confMatRF<-confusionMatrix(prediction, test_d$Trend)
+confMatRF
 
 #Step 6) Visualize Result
 varImpPlot(fit_rf)
@@ -1125,15 +1206,358 @@ imp_df
 
 library(pdp)           # for partial dependence plots
 library(vip)           # for variable importance plots
-vip(fit_rf, bar = FALSE, horizontal = FALSE, size = 1.5) 
+vip(fit_rf, geom = "col", horizontal = TRUE, size = 1.5, plot.engine="ggplot2") 
+vip(fit_rf, bar = FALSE, horizontal = FALSE, size = 1.5)  
+
+##### ROC curves
+#https://github.com/WandeRum/multiROC
+# install.packages('multiROC')
+require(multiROC)
+
+rf_pred <- as.data.frame(predict(fit_rf, test_d, type = 'prob'))
+colnames(rf_pred) <- c("NT","BB","BG","GG","BG")
+colnames(rf_pred) <- paste(colnames(rf_pred), "_pred_RF", sep="")
+
+true_label <- data.frame(dummies::dummy(test_d$Trend))
+colnames(true_label) <- c("NT","BB","BG","GG","BG")
+colnames(true_label) <- paste(colnames(true_label), "_true", sep="")
+final_df <- cbind(true_label, rf_pred)
+
+roc_res <- multi_roc(final_df, force_diag=T)
+# pr_res <- multi_pr(final_df, force_diag=T)
 
 
-# plot(trends_df$cv_summer_tmean_degC, 
-#      trends_df$slope_summer_tmean_degC)
+plot_roc_df <- plot_roc_data(roc_res)
+# plot_pr_df <- plot_pr_data(pr_res)
+
+ggplot(plot_roc_df, aes(x = 1-Specificity, y=Sensitivity)) +
+  geom_path(aes(color = Group), size=1.5) +
+  geom_segment(aes(x = 0, y = 0, xend = 1, yend = 1), 
+                        colour='grey', linetype = 'dotdash') +
+  theme_few() + 
+  theme(plot.title = element_text(hjust = 0.5), 
+                 legend.justification=c(1, 0), legend.position=c(.95, .05),
+                 legend.title=element_blank(), 
+                 legend.background = element_rect(fill=NULL, size=0.5, 
+                                                           linetype="solid", colour ="black"))
+
+ggplot(plot_pr_df, aes(x=Recall, y=Precision)) + 
+  geom_path(aes(color = Group, linetype=Method), size=1.5) + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5), 
+                 legend.justification=c(1, 0), legend.position=c(.95, .05),
+                 legend.title=element_blank(), 
+                 legend.background = element_rect(fill=NULL, size=0.5, 
+                                                           linetype="solid", colour ="black"))
+
+
+#Look at all the PDPs
+#Code from: https://bgreenwell.github.io/pdp/articles/pdp.html
+# fit_rf %>%  # the %>% operator is read as "and then"
+#   partial(pred.var = "elev") %>%
+#   autoplot(smooth = TRUE, ylab = expression(f(elev))) +
+#   theme_few() 
+# partial(fit_rf, pred.var = "elev", plot = TRUE, rug = TRUE, 
+#         plot.engine = "ggplot2")
+
+# fit_rf %>%  # the %>% operator is read as "and then"
+#   partial(pred.var = "slope_spring_tmean_degC") %>%
+#   autoplot(smooth = TRUE, ylab = expression(f(slope_spring_tmean_degC))) +
+#   theme_few() 
+# partial(fit_rf, pred.var = "slope_spring_tmean_degC", plot = TRUE, rug = TRUE, 
+#         plot.engine = "ggplot2")
+# 
+# #Get fancy
+# # Compute partial dependence data for lstat and rm
+# pd <- partial(fit_rf, pred.var = c("elev", "slope_spring_tmean_degC"))
+# 
+# # Default PDP
+# pdp1 <- plotPartial(pd)
+# 
+# # Add contour lines and use a different color palette
+# rwb <- colorRampPalette(c("blue", "white", "red"))
+# pdp2 <- plotPartial(pd, contour = TRUE, col.regions = rwb)
+# 
+# 
+# # Compute partial dependence data for lstat and rm
+# pd <- partial(fit_rf, pred.var = c("elev", "cv_summer_tmean_degC"))
+# 
+# # Default PDP
+# pdp1 <- plotPartial(pd)
+# partial(fit_rf, pred.var = c("elev", "cv_summer_tmean_degC"), plot = TRUE, chull = TRUE,
+#               palette = "magma", plot.engine="ggplot2")
+# 
+# #Where are all the positive slope lakes?
+# pd <- partial(fit_rf, pred.var = c("slope_summer_tmean_degC", "slope_winter_tmean_degC"))
+# 
+# # Default PDP
+# pdp1 <- plotPartial(pd)
+# partial(fit_rf, pred.var = c("slope_summer_tmean_degC", "slope_winter_tmean_degC"), plot = TRUE, chull = TRUE,
+#               palette = "magma", plot.engine="ggplot2")
+
+
+#Another tidy way via: https://rviews.rstudio.com/2019/06/19/a-gentle-intro-to-tidymodels/
+
+library(tidymodels)
+tidymodels::trends_split <- initial_split(trends_df, prop = 0.6)
+tidymodels::trends_split
+
 ```
 
 ##### Distribution of top predictors
 ```{r}
+png(
+  filename = 'figs/RF_results.png',
+  width = 8,
+  height = 8,
+  res = 600,
+  units = 'in'
+)
+
+
+# A<-vip(fit_rf, geom = "col", num_features=5L, horizontal = FALSE, size = 1.5, plot.engine="ggplot2", include_type=TRUE) +
+#   theme_few()
+
+#Create plot from scratch so I can re-label the factors
+
+A <- vi(fit_rf)[1:6, ] %>%
+  mutate(
+    # Variable = replace(Variable, Variable %in% c("perc_agriculture"), "% Ag"),
+    Variable = replace(Variable, Variable %in% c("perc_forest"), "% Forest"),
+    Variable = replace(Variable, Variable %in% c("elev"), "Elevation"),
+    Variable = replace(Variable, Variable %in% c("perc_urban"), "% Urban"),
+    Variable = replace(Variable, Variable %in% c("slope"), "Watershed slope"),
+    Variable = replace(Variable, Variable %in% c("pop_sum"), "Human population"),
+    Variable = replace(Variable, Variable %in% c("slope_winter_ppt_mm"), "Slope of winter ppt.")
+  ) %>%
+  ggplot(aes(
+    y = Importance,
+    x = forcats::fct_reorder(Variable, Importance, .desc = TRUE)
+  )) +
+  geom_bar(color="black",fill="grey50", width=0.75, position = "dodge", stat = "identity") +
+  labs(y = "Importance\n(Mean Decr. Accuracy)") +
+  theme_few() +
+  theme(axis.title.x = element_blank(),
+            axis.text.x = element_text(size=9))+
+  scale_y_continuous(limits=c(0,8))
+
+
+#% Forest
+med_noTrend <-
+  trends_df %>% filter(Trend == "No trend") %>% summarize(median(slope)) %>%
+  pull()
+B <-
+  ggplot(trends_df, aes(x = Trend, y = slope, fill = Trend)) +
+  # geom_violin()+
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(
+    aes(fill = Trend),
+    shape = 21,
+    size = 0.5,
+    alpha = 0.6,
+    position = position_jitter(0.2)
+  ) +
+  geom_hline(yintercept = med_noTrend, linetype = "dashed") +
+  scale_fill_manual(values = trendColors) +
+  guides(fill = "none") +
+  theme_few() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(y = "Watershed slope")
+
+#Elevation
+med_noTrend <-
+  trends_df %>% filter(Trend == "No trend") %>% summarize(median(perc_urban+0.1)) %>%
+  pull()
+C <-ggplot(trends_df, aes(x = Trend, y = perc_urban+0.1, fill = Trend)) +
+  # geom_violin()+
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(
+    aes(fill = Trend),
+    shape = 21,
+    size = 0.5,
+    alpha = 0.6,
+    position = position_jitter(0.2)
+  ) +
+  geom_hline(yintercept = 0.1, linetype = "dashed") +
+  scale_fill_manual(values = trendColors) +
+  guides(fill = "none") +
+  theme_few() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  scale_y_log10(labels = scales::label_number(),
+                # expand = c(0,100),
+                name = "% Urban")
+
+#% Urban
+#Consider logit transfomation as in Wagner & Schliep
+med_noTrend <-
+  trends_df %>% filter(Trend == "No trend") %>% summarize(median(slope_winter_ppt_mm)) %>%
+  pull()
+D<-  ggplot(trends_df, aes(x = Trend, y = slope_winter_ppt_mm, fill = Trend)) +
+  # geom_violin()+
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(
+    aes(fill = Trend),
+    shape = 21,
+    size = 0.5,
+    alpha = 0.6,
+    position = position_jitter(0.2)
+  ) +
+  geom_hline(yintercept = med_noTrend, linetype = "dashed") +
+  scale_fill_manual(values = trendColors) +
+  guides(fill = "none") +
+  theme_few() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(y="Slope of winter ppt. (mm/year)")
+  # scale_y_log10(labels = scales::label_number(),
+  #               # expand = c(0,100),
+  #               name = "Slope of winter ppt. (mm/year)")
+
+
+#Total population
+med_noTrend <-
+  trends_df %>% filter(Trend == "No trend") %>% summarize(median((pop_sum+1))) %>%
+  pull()
+E <- ggplot(trends_df, aes(x = Trend, y = pop_sum+1, fill = Trend)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(
+    aes(fill = Trend),
+    shape = 21,
+    size = 0.5,
+    alpha = 0.6,
+    position = position_jitter(0.2)
+  ) +
+  geom_hline(yintercept = med_noTrend, linetype = "dashed") +
+  # stat_summary(fun.min="quant.low",
+  #              fun="median",
+  #              fun.max="quant.high",
+  #              geom="pointrange", shape = 5) +
+  scale_fill_manual(values = trendColors) +
+  guides(fill = "none") +
+  theme_few() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  scale_y_log10(labels = scales::label_number_auto(),
+                name = "Human population")
+
+#Watershed slope
+med_noTrend <-
+  trends_df %>% filter(Trend == "No trend") %>% summarize(median(perc_forest)) %>%
+  pull()
+E<-  ggplot(trends_df, aes(x = Trend, y = perc_forest, fill = Trend)) +
+  # geom_violin()+
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(
+    aes(fill = Trend),
+    shape = 21,
+    size = 0.5,
+    alpha = 0.6,
+    position = position_jitter(0.2)
+  ) +
+  geom_hline(yintercept = (med_noTrend), linetype = "dashed") +
+  scale_fill_manual(values = trendColors) +
+  guides(fill = "none") +
+  theme_few() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(y="% Forest")
+  # scale_y_log10(labels = scales::label_number(),
+  #               # expand = c(0,100),
+  #               name = "Watershed slope")
+
+
+
+#CTI
+med_noTrend <-
+  trends_df %>%
+  filter(Trend == "No trend") %>%
+  summarize(median((LSA))) %>%
+  pull()
+G <- ggplot(trends_df, aes(x = Trend, y = LSA, fill = Trend)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(
+    aes(fill = Trend),
+    shape = 21,
+    size = 0.5,
+    alpha = 0.6,
+    position = position_jitter(0.2)
+  ) +
+  geom_hline(yintercept = med_noTrend, linetype = "dashed") +
+  # stat_summary(fun.min="quant.low",
+  #              fun="median",
+  #              fun.max="quant.high",
+  #              geom="pointrange", shape = 5) +
+  scale_fill_manual(values = trendColors) +
+  # guides(fill = "none") +
+  theme_few() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(y="Lake surface\narea (km2)")+
+  # scale_y_continuous(limits=c(500,1250))
+  scale_y_log10(labels = scales::label_number(),
+                # expand = c(0,100),
+                name = "Lake surface area")
+
+
+layout <- "
+AAAAAA
+BBCCDD
+EEFFGG
+"
+A + B + C + D + E + F + G +
+  plot_annotation(tag_levels = 'A') +
+  plot_layout(
+    design = layout,
+    guides = "collect",
+    heights = c(0.4, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6)
+  ) & theme(legend.position = 'bottom',
+            legend.text = element_text(size=9))
+
+dev.off()
+
+
+
+
+
+# #WTF is up with some of these winter temp trends?
+# prism_sum_temp %>%
+#   filter(Hylak_id %in% c("1059538","112241", #very negative
+#                          "1059611","112167",#very positive
+#                          "1062955")) %>% #reasonable
+#   filter(name=="tmean_degC" & season=="winter") %>%
+#   group_by(Hylak_id) %>%
+#   mutate(sd=sd(mean+10, na.rm=T),
+#             longmean=mean(mean+10, na.rm=T))%>%
+#   ggplot(aes(x=water_year, y=mean))+
+#   geom_point()+
+#   geom_text(x = 1990, y = 4,
+#             aes(group=Hylak_id, label = paste("sd =",round(sd,3))),
+#             color="black", size=3)+ #Add label for sample size
+#     geom_text(x = 1990, y = 3,
+#             aes(group=Hylak_id, label = paste("mean =",round(longmean,3))),
+#             color="black", size=3)+ #Add label for sample size
+#   facet_wrap(~Hylak_id)
+
 trendColors2 <- c(
   'No trend' = 'black',
   'Intensifying Blue' = '#1f78b4',
@@ -1313,10 +1737,214 @@ D<-dwl_all %>%
   theme(legend.position = "none")+
   labs(x="Mean WS slope")
 A|B|C|D 
+
+
 ```
 
+### Multinomial logistic regression
 
-### Explore trends
+```{r}
+mn_res <- nnet::multinom(Trend ~ perc_forest + elev + perc_urban + slope + pop_sum, data = train_d, Hessian=T, ref="No trend")
+summary(mn_res)
+mn_pred <- data.frame(predict(mn_res, test_d, type = 'prob'))
+# mn_pred <- data.frame(mn_pred)
+colnames(mn_pred) <- c("NT","BB","BG","GG","BG")
+colnames(mn_pred) <- paste(colnames(mn_pred), "_pred_MN", sep="")
+
+#Just like binary logistic regression, we need to convert the coefficients to odds by taking the exponential of the coefficients.
+exp(coef(mn_res))
+
+#Top 6 observations
+head(round(fitted(mn_res), 2))
+
+#Predicting and validating the model
+# Predicting the values for train dataset
+train_d$TrendPredicted <- predict(mn_res, newdata = train_d, "class")
+# Building classification table
+tab <- table(train_d$Trend, train_d$TrendPredicted)
+# Calculating accuracy - sum of diagonal elements divided by total obs
+round((sum(diag(tab))/sum(tab))*100,2)
+# Output
+# 61%
+
+#Compare with RF
+final_df <- cbind(true_label, rf_pred, mn_pred)
+
+roc_res <- multi_roc(final_df, force_diag=T)
+pr_res <- multi_pr(final_df, force_diag=T)
+
+
+plot_roc_df <- plot_roc_data(roc_res)
+plot_pr_df <- plot_pr_data(pr_res)
+
+
+trendColors3 <- c(
+  'No trend' = 'grey50',
+  'Intensifying Blue' = '#1f78b4',
+  'Green -> Blue' = '#a6cee3',
+  'Intensifying Green/Yellow' = '#33a02c',
+  'Blue -> Green' = '#b2df8a',
+  'Macro' ="#000000",
+  'Micro' ="grey20"
+)
+plot_roc_df %>%
+  mutate(Group=factor(Group,
+                      levels=c("NT","BB","GB","GG","BG","Macro","Micro"),
+                      labels = c("No trend",'Intensifying Blue','Green -> Blue','Intensifying Green/Yellow','Blue -> Green',"Macro","Micro"))) %>%
+ggplot(aes(x = 1-Specificity, y=Sensitivity)) +
+  geom_path(aes(color = Group, linetype=Method), size=1.5) +
+  geom_segment(aes(x = 0, y = 0, xend = 1, yend = 1), 
+                        colour='grey', linetype = 'dotdash') +
+  theme_few() + 
+  scale_color_manual(values=trendColors3)+
+  theme(plot.title = element_text(hjust = 0.5), 
+                 legend.justification=c(1, 0), legend.position=c(1, 0),
+                 legend.title=element_blank(), 
+                 legend.background = element_rect(fill=NULL, size=0.5, 
+                                                           linetype="solid", colour ="black"))+
+  facet_wrap(.~Group)
+
+```
+
+### LMER
+
+##### Explore data prior to buidling model
+```{r}
+library(devtools)
+install_github("dgrtwo/broom")
+library(broom.mixed)
+#Use tidy(modname) and augment(modname) to create a tidy dataframe of output. HALLELUJAH! 
+library(lme4)
+library(ggcorrplot)
+
+colnames<-(intersect( colnames(dwl_all),  colnames(lake_descriptor))) #identify common columns 
+
+trends_df<-dwl_all %>%
+  ungroup()%>%
+  inner_join(lake_descriptor, by=colnames) %>%
+  inner_join(lakezones %>% select(lagoslakeid, epanutr_zoneid, neon_zoneid, wwf_zoneid), by="lagoslakeid") %>%
+  filter(Trend!="No trend") %>%
+  # filter(Trend %in% c("Blue -> Green",
+  #                     "Green -> Blue")) %>%
+  select(Hylak_id, Trend, slope, epanutr_zoneid, neon_zoneid, wwf_zoneid,early_mean) %>%
+  rename(sens.slope=slope) %>%
+  # mutate(Trend_simple=NA) %>%
+  #   mutate(Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Blue"), 'Intensifying Blue'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Intensifying Green/Yellow"), 'Intensifying Green/Yellow'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Blue -> Green"), 'Blue -> Green'),
+  #         Trend_simple = replace(Trend_simple, Trend %in% c("Green -> Blue"), 'Green -> Blue')) %>%
+  distinct(Hylak_id,.keep_all = T) %>%
+  inner_join(blue_green_2018) %>% #add LakeCat variables
+  inner_join(prism_trends_wide) %>% #add PRISM variables
+  inner_join(population_trends) %>% #add GLCP population variables
+  inner_join(prism_trend_categories) %>%  #prism trend categories
+  # select(-Trend) %>%
+  # rename(Trend=Trend_simple) %>%
+  # mutate(Trend = factor(
+  #       Trend,
+  #       levels = c(
+  #         'Intensifying Blue',
+  #         'Green -> Blue',
+  #         'Intensifying Green/Yellow',
+  #         'Blue -> Green'))) %>%
+  select(-dWL, -group, -precip, -air_temp, -area)
+
+#Tutorial here: https://ourcodingclub.github.io/2017/03/15/mixed-models.html#one
+
+#Let's look at the vip from the RF model one more time
+vip(fit_rf, geom = "col", horizontal = TRUE, size = 1.5) 
+
+#Are any of these variables correlated with each other?
+corr_alt <- trends_df %>%
+  select(elev, perc_forest, perc_urban,
+         slope, pop_sum, cti) %>%
+  # drop_na() %>%
+  cor(method="pearson")
+# use the package's cor_pmat function to calculate p-values for the correlations
+p.mat_alt <-  trends_df %>%
+  select(elev, perc_forest, perc_urban,
+         slope, pop_sum, cti) %>%
+  cor_pmat()
+
+#Create informative correlation matrix 
+ggcorrplot(corr_alt, title = "Correlation matrix for lake level variables",
+           lab=TRUE, 
+           p.mat = p.mat_alt, sig.level = .05,
+           type="upper")
+
+#Curious about a few of these. 
+trends_df %>%
+  ggplot(aes(x=cv_summer_tmean_degC,y=elev, fill=slope_summer_tmean_degC))+
+  geom_point(size=3,shape=21)+
+  # colorspace::scale_fill_continuous_sequential(palette="ag_Sunset")+
+      scale_fill_gradient(
+  low = "#326cc5",
+  high = "red",
+  space = "Lab",
+  na.value = "grey50",
+  guide = "colourbar",
+  aesthetics = "fill",
+  name = "summer tmean\nsens slope"
+)+
+  theme_few()
+#Here cv of summer tmean is the variation over the 1984-2020 period. So higher elevation sites tend to be more variable.
+#Possibly because higher sites are warming fast? Speculative. 
+
+trends_df %>%
+  ggplot(aes(x=cv_summer_tmean_degC,y=slope, fill=elev))+
+  geom_point(size=3,shape=21)+
+  theme_few()+
+  colorspace::scale_fill_continuous_sequential(palette="ag_Sunset")
+# Given that slope and cv_summer_tmean_degC are lower down on the VIP list, I won't include those in the model.
+```
+
+##### Build model
+```{r}
+#First time I ran this I got a warning to scale the variables, so doing that here:
+trends_df <- trends_df %>%
+  mutate(elev_z=scale(elev),
+         sil_z=scale(sil),
+         slope_spring_tmean_degC_z=scale(slope_spring_tmean_degC),
+         slope_summer_ppt_mm_z=scale(slope_summer_ppt_mm),
+         cv_winter_tmean_degC_z=scale(cv_winter_tmean_degC))
+
+# mixed.lmer <- lmer(sens.slope ~ early_mean + elev_z +  slope + slope_spring_tmean_degC_z + sil_z + slope_summer_ppt_mm_z + cv_winter_tmean_degC_z + (1|Trend), data = trends_df)
+# summary(mixed.lmer)
+# MuMIn::r.squaredGLMM(mixed.lmer)
+# #How much variation does Trend account for?
+# 0.3322/(0.3322 + 0.1067)  # ~75 %
+mixed.lmer <- lmer(sens.slope ~ cti + pop_sum +  slope + perc_urban + perc_forest + (1|Trend), data = trends_df)
+summary(mixed.lmer)
+MuMIn::r.squaredGLMM(mixed.lmer)
+#How much variation does Trend account for?
+0.34799/(0.34799+0.09869)  # ~75 %
+
+#Diagnostic plots
+plot(mixed.lmer)  
+qqnorm(resid(mixed.lmer))
+qqline(resid(mixed.lmer)) 
+
+library(ggeffects)  # install the package first if you haven't already, then load it
+
+ggpredict(mixed.lmer, terms = c("perc_forest", "Trend"), type = "re") %>% 
+   plot() +
+   theme_minimal()
+
+library(sjPlot)
+
+# Visualise random effects 
+(re.effects <- plot_model(mixed.lmer, type = "re", show.values = TRUE))
+
+
+lm <- lm(sens.slope ~ elev_z + slope_spring_tmean_degC_z + sil_z + slope_summer_ppt_mm_z + cv_winter_tmean_degC_z, data = trends_df)
+summary(lm)
+
+
+mixed.lmer <- lmer(sens.slope ~ slope_summer_tmean_degC + (1|Trend), data = trends_df)
+summary(mixed.lmer)
+```
+
+#~*~* Explore trends
 ```{r}
 head(trends_df)
 
@@ -1499,4 +2127,24 @@ explore %>%
        subtitle="But the slope of the color change isn't different between lakes experiencing summer warming or not") +
   theme_few()
 
+```
+
+##** MISC**
+Export data for Sam Sillen
+```{r,eval=F}
+head(dwl_all)
+
+colnames<-(intersect( colnames(dwl_all),  colnames(lake_descriptor))) #identify common columns between data.tables
+
+
+export <- dwl_all %>%
+  ungroup()%>%
+  inner_join(lake_descriptor, by=colnames) %>%
+  select(Hylak_id, comid, gnis_id, gnis_name, lagoslakeid, lake_lat_decdeg, lake_lon_decdeg, elevation, lake_centroidstate,
+         year, value, slope, intercept, Trend) %>%
+  rename(dWL=value) %>%
+  filter(Trend!="No trend")
+write_csv(export,'data/export/lake_color_changing.csv')
+
+length(unique(export$Hylak_id))
 ```
