@@ -320,4 +320,214 @@ gc()
 ```
 
 
+### LAGOS-US zone identifiers
+```{r, eval=F}
 
+#Pull from EDI
+# https://portal.edirepository.org/nis/mapbrowse?packageid=edi.854.1
+
+# Package ID: edi.854.1 Cataloging System:https://pasta.edirepository.org.
+# Data set title: LAGOS-US LOCUS v1.0: Data module of location, identifiers, and physical characteristics of lakes and their watersheds in the conterminous U.S..
+# Data set creator:  Nicole Smith - Michigan State University 
+# Data set creator:  Katherine Webster - Michigan State University 
+# Data set creator:  Lauren Rodriguez - Michigan State University 
+# Data set creator:  Kendra Cheruvelil - Michigan State University 
+# Data set creator:  Patricia Soranno - Michigan State University 
+# Contact:  Kendra Cheruvelil -  Michigan State University  - ksc@msu.edu
+# Stylesheet for metadata conversion into program: John H. Porter, Univ. Virginia, jporter@Virginia.edu 
+#
+#install package tidyverse if not already installed
+if(!require(tidyverse)){ install.packages("tidyverse") }  
+library("tidyverse") 
+infile1 <- trimws("https://pasta.lternet.edu/package/data/eml/edi/854/1/007ca4f5ec02bb5809fc661dcfa7a903") 
+infile1 <-sub("^https","http",infile1)
+# This creates a tibble named: lakezones 
+lakezones <-read_delim(infile1  
+                             ,delim=","   
+                             ,skip=1 
+                             ,quote='"'  
+                             , col_names=c( 
+                               "lagoslakeid",   
+                               "lake_nhdid",   
+                               "lake_nhdfcode",   
+                               "lake_nhdftype",   
+                               "lake_reachcode",   
+                               "lake_namegnis",   
+                               "lake_namelagos",   
+                               "lake_onlandborder",   
+                               "lake_ismultipart",   
+                               "lake_missingws",   
+                               "lake_shapeflag",   
+                               "lake_lat_decdeg",   
+                               "lake_lon_decdeg",   
+                               "lake_elevation_m",   
+                               "lake_centroidstate",   
+                               "lake_states",   
+                               "lake_county",   
+                               "lake_countyfips",   
+                               "lake_huc12",   
+                               "buff100_zoneid",   
+                               "buff500_zoneid",   
+                               "ws_zoneid",   
+                               "nws_zoneid",   
+                               "hu12_zoneid",   
+                               "hu8_zoneid",   
+                               "hu4_zoneid",   
+                               "county_zoneid",   
+                               "state_zoneid",   
+                               "epanutr_zoneid",   
+                               "omernik3_zoneid",   
+                               "wwf_zoneid",   
+                               "mlra_zoneid",   
+                               "bailey_zoneid",   
+                               "neon_zoneid"   ), 
+                             col_types=list(
+                               col_number() ,  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(), 
+                               col_number() , 
+                               col_number() , 
+                               col_number() ,  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character(),  
+                               col_character()), 
+                             na=c(" ",".","NA")  )
+
+
+# Convert Missing Values to NA for individual vectors 
+lakezones$lagoslakeid <- ifelse((trimws(as.character(lakezones$lagoslakeid))==trimws("NA")),NA,lakezones$lagoslakeid)               
+suppressWarnings(lakezones$lagoslakeid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lagoslakeid))==as.character(as.numeric("NA"))),NA,lakezones$lagoslakeid))
+lakezones$lake_nhdid <- ifelse((trimws(as.character(lakezones$lake_nhdid))==trimws("NA")),NA,lakezones$lake_nhdid)               
+suppressWarnings(lakezones$lake_nhdid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_nhdid))==as.character(as.numeric("NA"))),NA,lakezones$lake_nhdid))
+lakezones$lake_nhdfcode <- ifelse((trimws(as.character(lakezones$lake_nhdfcode))==trimws("NA")),NA,lakezones$lake_nhdfcode)               
+suppressWarnings(lakezones$lake_nhdfcode <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_nhdfcode))==as.character(as.numeric("NA"))),NA,lakezones$lake_nhdfcode))
+lakezones$lake_nhdftype <- ifelse((trimws(as.character(lakezones$lake_nhdftype))==trimws("NA")),NA,lakezones$lake_nhdftype)               
+suppressWarnings(lakezones$lake_nhdftype <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_nhdftype))==as.character(as.numeric("NA"))),NA,lakezones$lake_nhdftype))
+lakezones$lake_reachcode <- ifelse((trimws(as.character(lakezones$lake_reachcode))==trimws("NA")),NA,lakezones$lake_reachcode)               
+suppressWarnings(lakezones$lake_reachcode <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_reachcode))==as.character(as.numeric("NA"))),NA,lakezones$lake_reachcode))
+lakezones$lake_namegnis <- ifelse((trimws(as.character(lakezones$lake_namegnis))==trimws("NA")),NA,lakezones$lake_namegnis)               
+suppressWarnings(lakezones$lake_namegnis <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_namegnis))==as.character(as.numeric("NA"))),NA,lakezones$lake_namegnis))
+lakezones$lake_namelagos <- ifelse((trimws(as.character(lakezones$lake_namelagos))==trimws("NA")),NA,lakezones$lake_namelagos)               
+suppressWarnings(lakezones$lake_namelagos <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_namelagos))==as.character(as.numeric("NA"))),NA,lakezones$lake_namelagos))
+lakezones$lake_onlandborder <- ifelse((trimws(as.character(lakezones$lake_onlandborder))==trimws("NA")),NA,lakezones$lake_onlandborder)               
+suppressWarnings(lakezones$lake_onlandborder <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_onlandborder))==as.character(as.numeric("NA"))),NA,lakezones$lake_onlandborder))
+lakezones$lake_ismultipart <- ifelse((trimws(as.character(lakezones$lake_ismultipart))==trimws("NA")),NA,lakezones$lake_ismultipart)               
+suppressWarnings(lakezones$lake_ismultipart <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_ismultipart))==as.character(as.numeric("NA"))),NA,lakezones$lake_ismultipart))
+lakezones$lake_missingws <- ifelse((trimws(as.character(lakezones$lake_missingws))==trimws("NA")),NA,lakezones$lake_missingws)               
+suppressWarnings(lakezones$lake_missingws <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_missingws))==as.character(as.numeric("NA"))),NA,lakezones$lake_missingws))
+lakezones$lake_shapeflag <- ifelse((trimws(as.character(lakezones$lake_shapeflag))==trimws("NA")),NA,lakezones$lake_shapeflag)               
+suppressWarnings(lakezones$lake_shapeflag <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_shapeflag))==as.character(as.numeric("NA"))),NA,lakezones$lake_shapeflag))
+lakezones$lake_lat_decdeg <- ifelse((trimws(as.character(lakezones$lake_lat_decdeg))==trimws("NA")),NA,lakezones$lake_lat_decdeg)               
+suppressWarnings(lakezones$lake_lat_decdeg <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_lat_decdeg))==as.character(as.numeric("NA"))),NA,lakezones$lake_lat_decdeg))
+lakezones$lake_lon_decdeg <- ifelse((trimws(as.character(lakezones$lake_lon_decdeg))==trimws("NA")),NA,lakezones$lake_lon_decdeg)               
+suppressWarnings(lakezones$lake_lon_decdeg <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_lon_decdeg))==as.character(as.numeric("NA"))),NA,lakezones$lake_lon_decdeg))
+lakezones$lake_elevation_m <- ifelse((trimws(as.character(lakezones$lake_elevation_m))==trimws("NA")),NA,lakezones$lake_elevation_m)               
+suppressWarnings(lakezones$lake_elevation_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_elevation_m))==as.character(as.numeric("NA"))),NA,lakezones$lake_elevation_m))
+lakezones$lake_centroidstate <- ifelse((trimws(as.character(lakezones$lake_centroidstate))==trimws("NA")),NA,lakezones$lake_centroidstate)               
+suppressWarnings(lakezones$lake_centroidstate <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_centroidstate))==as.character(as.numeric("NA"))),NA,lakezones$lake_centroidstate))
+lakezones$lake_states <- ifelse((trimws(as.character(lakezones$lake_states))==trimws("NA")),NA,lakezones$lake_states)               
+suppressWarnings(lakezones$lake_states <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_states))==as.character(as.numeric("NA"))),NA,lakezones$lake_states))
+lakezones$lake_county <- ifelse((trimws(as.character(lakezones$lake_county))==trimws("NA")),NA,lakezones$lake_county)               
+suppressWarnings(lakezones$lake_county <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_county))==as.character(as.numeric("NA"))),NA,lakezones$lake_county))
+lakezones$lake_countyfips <- ifelse((trimws(as.character(lakezones$lake_countyfips))==trimws("NA")),NA,lakezones$lake_countyfips)               
+suppressWarnings(lakezones$lake_countyfips <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_countyfips))==as.character(as.numeric("NA"))),NA,lakezones$lake_countyfips))
+lakezones$lake_huc12 <- ifelse((trimws(as.character(lakezones$lake_huc12))==trimws("NA")),NA,lakezones$lake_huc12)               
+suppressWarnings(lakezones$lake_huc12 <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$lake_huc12))==as.character(as.numeric("NA"))),NA,lakezones$lake_huc12))
+lakezones$buff100_zoneid <- ifelse((trimws(as.character(lakezones$buff100_zoneid))==trimws("NA")),NA,lakezones$buff100_zoneid)               
+suppressWarnings(lakezones$buff100_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$buff100_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$buff100_zoneid))
+lakezones$buff500_zoneid <- ifelse((trimws(as.character(lakezones$buff500_zoneid))==trimws("NA")),NA,lakezones$buff500_zoneid)               
+suppressWarnings(lakezones$buff500_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$buff500_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$buff500_zoneid))
+lakezones$ws_zoneid <- ifelse((trimws(as.character(lakezones$ws_zoneid))==trimws("NA")),NA,lakezones$ws_zoneid)               
+suppressWarnings(lakezones$ws_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$ws_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$ws_zoneid))
+lakezones$nws_zoneid <- ifelse((trimws(as.character(lakezones$nws_zoneid))==trimws("NA")),NA,lakezones$nws_zoneid)               
+suppressWarnings(lakezones$nws_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$nws_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$nws_zoneid))
+lakezones$hu12_zoneid <- ifelse((trimws(as.character(lakezones$hu12_zoneid))==trimws("NA")),NA,lakezones$hu12_zoneid)               
+suppressWarnings(lakezones$hu12_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$hu12_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$hu12_zoneid))
+lakezones$hu8_zoneid <- ifelse((trimws(as.character(lakezones$hu8_zoneid))==trimws("NA")),NA,lakezones$hu8_zoneid)               
+suppressWarnings(lakezones$hu8_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$hu8_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$hu8_zoneid))
+lakezones$hu4_zoneid <- ifelse((trimws(as.character(lakezones$hu4_zoneid))==trimws("NA")),NA,lakezones$hu4_zoneid)               
+suppressWarnings(lakezones$hu4_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$hu4_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$hu4_zoneid))
+lakezones$county_zoneid <- ifelse((trimws(as.character(lakezones$county_zoneid))==trimws("NA")),NA,lakezones$county_zoneid)               
+suppressWarnings(lakezones$county_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$county_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$county_zoneid))
+lakezones$state_zoneid <- ifelse((trimws(as.character(lakezones$state_zoneid))==trimws("NA")),NA,lakezones$state_zoneid)               
+suppressWarnings(lakezones$state_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$state_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$state_zoneid))
+lakezones$epanutr_zoneid <- ifelse((trimws(as.character(lakezones$epanutr_zoneid))==trimws("NA")),NA,lakezones$epanutr_zoneid)               
+suppressWarnings(lakezones$epanutr_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$epanutr_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$epanutr_zoneid))
+lakezones$omernik3_zoneid <- ifelse((trimws(as.character(lakezones$omernik3_zoneid))==trimws("NA")),NA,lakezones$omernik3_zoneid)               
+suppressWarnings(lakezones$omernik3_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$omernik3_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$omernik3_zoneid))
+lakezones$wwf_zoneid <- ifelse((trimws(as.character(lakezones$wwf_zoneid))==trimws("NA")),NA,lakezones$wwf_zoneid)               
+suppressWarnings(lakezones$wwf_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$wwf_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$wwf_zoneid))
+lakezones$mlra_zoneid <- ifelse((trimws(as.character(lakezones$mlra_zoneid))==trimws("NA")),NA,lakezones$mlra_zoneid)               
+suppressWarnings(lakezones$mlra_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$mlra_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$mlra_zoneid))
+lakezones$bailey_zoneid <- ifelse((trimws(as.character(lakezones$bailey_zoneid))==trimws("NA")),NA,lakezones$bailey_zoneid)               
+suppressWarnings(lakezones$bailey_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$bailey_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$bailey_zoneid))
+lakezones$neon_zoneid <- ifelse((trimws(as.character(lakezones$neon_zoneid))==trimws("NA")),NA,lakezones$neon_zoneid)               
+suppressWarnings(lakezones$neon_zoneid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakezones$neon_zoneid))==as.character(as.numeric("NA"))),NA,lakezones$neon_zoneid))
+
+
+# Observed issues when reading the data. An empty list is good!
+problems(lakezones) 
+# Here is the structure of the input data tibble: 
+glimpse(lakezones) 
+# And some statistical summaries of the data 
+summary(lakezones) 
+# Get more details on character variables
+
+summary(as.factor(lakezones$lake_nhdid)) 
+summary(as.factor(lakezones$lake_nhdfcode)) 
+summary(as.factor(lakezones$lake_nhdftype)) 
+summary(as.factor(lakezones$lake_reachcode)) 
+summary(as.factor(lakezones$lake_namegnis)) 
+summary(as.factor(lakezones$lake_namelagos)) 
+summary(as.factor(lakezones$lake_onlandborder)) 
+summary(as.factor(lakezones$lake_ismultipart)) 
+summary(as.factor(lakezones$lake_missingws)) 
+summary(as.factor(lakezones$lake_shapeflag)) 
+summary(as.factor(lakezones$lake_centroidstate)) 
+summary(as.factor(lakezones$lake_states)) 
+summary(as.factor(lakezones$lake_county)) 
+summary(as.factor(lakezones$lake_countyfips)) 
+summary(as.factor(lakezones$lake_huc12)) 
+summary(as.factor(lakezones$buff100_zoneid)) 
+summary(as.factor(lakezones$buff500_zoneid)) 
+summary(as.factor(lakezones$ws_zoneid)) 
+summary(as.factor(lakezones$nws_zoneid)) 
+summary(as.factor(lakezones$hu12_zoneid)) 
+summary(as.factor(lakezones$hu8_zoneid)) 
+summary(as.factor(lakezones$hu4_zoneid)) 
+summary(as.factor(lakezones$county_zoneid)) 
+summary(as.factor(lakezones$state_zoneid)) 
+summary(as.factor(lakezones$epanutr_zoneid)) 
+summary(as.factor(lakezones$omernik3_zoneid)) 
+summary(as.factor(lakezones$wwf_zoneid)) 
+summary(as.factor(lakezones$mlra_zoneid)) 
+summary(as.factor(lakezones$bailey_zoneid)) 
+summary(as.factor(lakezones$neon_zoneid)) 
+
+save(lakezones, file = 'data/lakezones.RData')
+```
