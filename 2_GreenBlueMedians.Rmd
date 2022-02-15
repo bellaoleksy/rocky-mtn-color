@@ -156,13 +156,18 @@ blue_green_2018 <- glcp_high_lakes %>%
   na.omit(.) #Everything has to be complete data. 
 
   
-#How many sites do we drop with na.omit()
-# length(unique(blue_green_2018$Hylak_id))
-#1318
-# blue_green_2018 <- blue_green_2018 %>% na.omit(.)
+#How many sites do we have
 # length(unique(blue_green_2018$Hylak_id))
 #956
 
+#How many lakes in each category?
+blue_green_2018 %>%
+  group_by(group) %>%
+  count() %>%
+  pivot_wider(names_from=group, values_from=n) %>%
+  mutate(total=sum(`Blue/clear`,`Green/murky`),
+         perc_blue=(`Blue/clear`/total)*100,
+         perc_green=(`Green/murky`/total)*100)
 
 
 
