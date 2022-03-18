@@ -38,6 +38,7 @@ library(data.table)
 library(cvms)
 library(skimr)
 library(huxtable)
+library(patchwork)
 
 # Use dplyr select
 select<-dplyr::select
@@ -156,18 +157,6 @@ blue_green_2018 <- glcp_high_lakes %>%
   na.omit(.) #Everything has to be complete data. 
 
   
-#How many sites do we have
-# length(unique(blue_green_2018$Hylak_id))
-#956
-
-#How many lakes in each category?
-blue_green_2018 %>%
-  group_by(group) %>%
-  count() %>%
-  pivot_wider(names_from=group, values_from=n) %>%
-  mutate(total=sum(`Blue/clear`,`Green/murky`),
-         perc_blue=(`Blue/clear`/total)*100,
-         perc_green=(`Green/murky`/total)*100)
 
 
 
@@ -244,7 +233,7 @@ ggplot() +
   #      subtitle="Dominant\nwavelength (nm)")
 dev.off()
 
-png(filename = 'figs/bg_better_map.png',
+png(filename = 'figs/spatial_color_map_continuous.png',
     width = 4, height = 6, units = 'in', res = 300)
 
 tm_shape(hil) +
@@ -269,26 +258,7 @@ tm_legend(legend.position = c(0,0),
             legend.frame = 'black') 
 
 
-# base_map+inset_element(legend, 0.85, 0.75, 1, 1)
-# 
-# layout <- '
-# A#
-# AB
-# A#
-# '
-# wrap_plots(A = base_map, B = legend, design = layout)+
-#   plot_layout(widths = c(5, 0.5))
 
-# base_map_grob<-tmap_grob(base_map)
-# 
-# plot_grid(base_map_grob,legend,
-#           rel_widths = c(2,0.5),
-#           rel_heights =c(1,1))
-#   # scale=c(1,0.75))
-# 
-# ggpubr::ggarrange(base_map_grob, legend,
-#                   heights = c(1, 0.25),
-#                   widths = c(1, 1))
 
 dev.off()
 
@@ -302,7 +272,7 @@ dev.off()
 
 
 
-png(filename = 'figs/bg_map.png',
+png(filename = 'figs/bg_map_categorical.png',
     width = 5, height = 8, units = 'in', res = 300)
 
 tm_shape(hil) +
@@ -322,7 +292,7 @@ tm_shape(states) +
              border.col = 'black',
              border.lwd = 1,
              jitter = .3,
-             palette = c('deepskyblue2','darkolivegreen3')) + 
+             palette = c('#1f78b4','#33a02c')) + 
   tm_legend(legend.position = c(0,0),
             legend.bg.color = 'gray90',
             legend.frame = 'black') 
