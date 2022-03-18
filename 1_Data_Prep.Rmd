@@ -320,7 +320,7 @@ gc()
 ```
 
 
-### LAGOS-US zone identifiers
+### LAGOS-US zone identifiers & connectivity metrics
 ```{r, eval=F}
 
 #Pull from EDI
@@ -529,5 +529,206 @@ summary(as.factor(lakezones$mlra_zoneid))
 summary(as.factor(lakezones$bailey_zoneid)) 
 summary(as.factor(lakezones$neon_zoneid)) 
 
-save(lakezones, file = 'data/lakezones.RData')
+
+
+### Add connectivity metrics from LAGOS-US NETS
+infile2 <- trimws("https://pasta.lternet.edu/package/data/eml/edi/854/1/fd7fe936d290a12bc6dbf5c41047849e") 
+infile2 <-sub("^https","http",infile2)
+# This creates a tibble named: lakecharacteristics 
+lakecharacteristics <-read_delim(infile2  
+                                 ,delim=","   
+                                 ,skip=1 
+                                 ,quote='"'  
+                                 , col_names=c( 
+                                   "lagoslakeid",   
+                                   "lake_waterarea_ha",   
+                                   "lake_totalarea_ha",   
+                                   "lake_islandarea_ha",   
+                                   "lake_perimeter_m",   
+                                   "lake_islandperimeter_m",   
+                                   "lake_shorelinedevfactor",   
+                                   "lake_mbgconhull_length_m",   
+                                   "lake_mbgconhull_width_m",   
+                                   "lake_mbgconhull_orientation_deg",   
+                                   "lake_mbgrect_length_m",   
+                                   "lake_mbgrect_width_m",   
+                                   "lake_mbgrect_arearatio",   
+                                   "lake_meanwidth_m",   
+                                   "lake_connectivity_class",   
+                                   "lake_connectivity_fluctuates",   
+                                   "lake_connectivity_permanent",   
+                                   "lake_lakes4ha_upstream_ha",   
+                                   "lake_lakes4ha_upstream_n",   
+                                   "lake_lakes1ha_upstream_ha",   
+                                   "lake_lakes1ha_upstream_n",   
+                                   "lake_lakes10ha_upstream_n",   
+                                   "lake_lakes10ha_upstream_ha",   
+                                   "lake_glaciatedlatewisc"   ), 
+                                 col_types=list(
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() ,  
+                                   col_character(),  
+                                   col_character(),  
+                                   col_character(), 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() , 
+                                   col_number() ,  
+                                   col_character()), 
+                                 na=c(" ",".","NA")  )
+
+
+# Convert Missing Values to NA for individual vectors 
+lakecharacteristics$lagoslakeid <- ifelse((trimws(as.character(lakecharacteristics$lagoslakeid))==trimws("NA")),NA,lakecharacteristics$lagoslakeid)               
+suppressWarnings(lakecharacteristics$lagoslakeid <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lagoslakeid))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lagoslakeid))
+lakecharacteristics$lake_waterarea_ha <- ifelse((trimws(as.character(lakecharacteristics$lake_waterarea_ha))==trimws("NA")),NA,lakecharacteristics$lake_waterarea_ha)               
+suppressWarnings(lakecharacteristics$lake_waterarea_ha <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_waterarea_ha))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_waterarea_ha))
+lakecharacteristics$lake_totalarea_ha <- ifelse((trimws(as.character(lakecharacteristics$lake_totalarea_ha))==trimws("NA")),NA,lakecharacteristics$lake_totalarea_ha)               
+suppressWarnings(lakecharacteristics$lake_totalarea_ha <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_totalarea_ha))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_totalarea_ha))
+lakecharacteristics$lake_islandarea_ha <- ifelse((trimws(as.character(lakecharacteristics$lake_islandarea_ha))==trimws("NA")),NA,lakecharacteristics$lake_islandarea_ha)               
+suppressWarnings(lakecharacteristics$lake_islandarea_ha <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_islandarea_ha))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_islandarea_ha))
+lakecharacteristics$lake_perimeter_m <- ifelse((trimws(as.character(lakecharacteristics$lake_perimeter_m))==trimws("NA")),NA,lakecharacteristics$lake_perimeter_m)               
+suppressWarnings(lakecharacteristics$lake_perimeter_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_perimeter_m))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_perimeter_m))
+lakecharacteristics$lake_islandperimeter_m <- ifelse((trimws(as.character(lakecharacteristics$lake_islandperimeter_m))==trimws("NA")),NA,lakecharacteristics$lake_islandperimeter_m)               
+suppressWarnings(lakecharacteristics$lake_islandperimeter_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_islandperimeter_m))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_islandperimeter_m))
+lakecharacteristics$lake_shorelinedevfactor <- ifelse((trimws(as.character(lakecharacteristics$lake_shorelinedevfactor))==trimws("NA")),NA,lakecharacteristics$lake_shorelinedevfactor)               
+suppressWarnings(lakecharacteristics$lake_shorelinedevfactor <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_shorelinedevfactor))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_shorelinedevfactor))
+lakecharacteristics$lake_mbgconhull_length_m <- ifelse((trimws(as.character(lakecharacteristics$lake_mbgconhull_length_m))==trimws("NA")),NA,lakecharacteristics$lake_mbgconhull_length_m)               
+suppressWarnings(lakecharacteristics$lake_mbgconhull_length_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_mbgconhull_length_m))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_mbgconhull_length_m))
+lakecharacteristics$lake_mbgconhull_width_m <- ifelse((trimws(as.character(lakecharacteristics$lake_mbgconhull_width_m))==trimws("NA")),NA,lakecharacteristics$lake_mbgconhull_width_m)               
+suppressWarnings(lakecharacteristics$lake_mbgconhull_width_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_mbgconhull_width_m))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_mbgconhull_width_m))
+lakecharacteristics$lake_mbgconhull_orientation_deg <- ifelse((trimws(as.character(lakecharacteristics$lake_mbgconhull_orientation_deg))==trimws("NA")),NA,lakecharacteristics$lake_mbgconhull_orientation_deg)               
+suppressWarnings(lakecharacteristics$lake_mbgconhull_orientation_deg <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_mbgconhull_orientation_deg))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_mbgconhull_orientation_deg))
+lakecharacteristics$lake_mbgrect_length_m <- ifelse((trimws(as.character(lakecharacteristics$lake_mbgrect_length_m))==trimws("NA")),NA,lakecharacteristics$lake_mbgrect_length_m)               
+suppressWarnings(lakecharacteristics$lake_mbgrect_length_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_mbgrect_length_m))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_mbgrect_length_m))
+lakecharacteristics$lake_mbgrect_width_m <- ifelse((trimws(as.character(lakecharacteristics$lake_mbgrect_width_m))==trimws("NA")),NA,lakecharacteristics$lake_mbgrect_width_m)               
+suppressWarnings(lakecharacteristics$lake_mbgrect_width_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_mbgrect_width_m))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_mbgrect_width_m))
+lakecharacteristics$lake_mbgrect_arearatio <- ifelse((trimws(as.character(lakecharacteristics$lake_mbgrect_arearatio))==trimws("NA")),NA,lakecharacteristics$lake_mbgrect_arearatio)               
+suppressWarnings(lakecharacteristics$lake_mbgrect_arearatio <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_mbgrect_arearatio))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_mbgrect_arearatio))
+lakecharacteristics$lake_meanwidth_m <- ifelse((trimws(as.character(lakecharacteristics$lake_meanwidth_m))==trimws("NA")),NA,lakecharacteristics$lake_meanwidth_m)               
+suppressWarnings(lakecharacteristics$lake_meanwidth_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_meanwidth_m))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_meanwidth_m))
+lakecharacteristics$lake_connectivity_class <- ifelse((trimws(as.character(lakecharacteristics$lake_connectivity_class))==trimws("NA")),NA,lakecharacteristics$lake_connectivity_class)               
+suppressWarnings(lakecharacteristics$lake_connectivity_class <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_connectivity_class))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_connectivity_class))
+lakecharacteristics$lake_connectivity_fluctuates <- ifelse((trimws(as.character(lakecharacteristics$lake_connectivity_fluctuates))==trimws("NA")),NA,lakecharacteristics$lake_connectivity_fluctuates)               
+suppressWarnings(lakecharacteristics$lake_connectivity_fluctuates <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_connectivity_fluctuates))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_connectivity_fluctuates))
+lakecharacteristics$lake_connectivity_permanent <- ifelse((trimws(as.character(lakecharacteristics$lake_connectivity_permanent))==trimws("NA")),NA,lakecharacteristics$lake_connectivity_permanent)               
+suppressWarnings(lakecharacteristics$lake_connectivity_permanent <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_connectivity_permanent))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_connectivity_permanent))
+lakecharacteristics$lake_lakes4ha_upstream_ha <- ifelse((trimws(as.character(lakecharacteristics$lake_lakes4ha_upstream_ha))==trimws("NA")),NA,lakecharacteristics$lake_lakes4ha_upstream_ha)               
+suppressWarnings(lakecharacteristics$lake_lakes4ha_upstream_ha <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_lakes4ha_upstream_ha))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_lakes4ha_upstream_ha))
+lakecharacteristics$lake_lakes4ha_upstream_n <- ifelse((trimws(as.character(lakecharacteristics$lake_lakes4ha_upstream_n))==trimws("NA")),NA,lakecharacteristics$lake_lakes4ha_upstream_n)               
+suppressWarnings(lakecharacteristics$lake_lakes4ha_upstream_n <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_lakes4ha_upstream_n))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_lakes4ha_upstream_n))
+lakecharacteristics$lake_lakes1ha_upstream_ha <- ifelse((trimws(as.character(lakecharacteristics$lake_lakes1ha_upstream_ha))==trimws("NA")),NA,lakecharacteristics$lake_lakes1ha_upstream_ha)               
+suppressWarnings(lakecharacteristics$lake_lakes1ha_upstream_ha <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_lakes1ha_upstream_ha))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_lakes1ha_upstream_ha))
+lakecharacteristics$lake_lakes1ha_upstream_n <- ifelse((trimws(as.character(lakecharacteristics$lake_lakes1ha_upstream_n))==trimws("NA")),NA,lakecharacteristics$lake_lakes1ha_upstream_n)               
+suppressWarnings(lakecharacteristics$lake_lakes1ha_upstream_n <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_lakes1ha_upstream_n))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_lakes1ha_upstream_n))
+lakecharacteristics$lake_lakes10ha_upstream_n <- ifelse((trimws(as.character(lakecharacteristics$lake_lakes10ha_upstream_n))==trimws("NA")),NA,lakecharacteristics$lake_lakes10ha_upstream_n)               
+suppressWarnings(lakecharacteristics$lake_lakes10ha_upstream_n <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_lakes10ha_upstream_n))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_lakes10ha_upstream_n))
+lakecharacteristics$lake_lakes10ha_upstream_ha <- ifelse((trimws(as.character(lakecharacteristics$lake_lakes10ha_upstream_ha))==trimws("NA")),NA,lakecharacteristics$lake_lakes10ha_upstream_ha)               
+suppressWarnings(lakecharacteristics$lake_lakes10ha_upstream_ha <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_lakes10ha_upstream_ha))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_lakes10ha_upstream_ha))
+lakecharacteristics$lake_glaciatedlatewisc <- ifelse((trimws(as.character(lakecharacteristics$lake_glaciatedlatewisc))==trimws("NA")),NA,lakecharacteristics$lake_glaciatedlatewisc)               
+suppressWarnings(lakecharacteristics$lake_glaciatedlatewisc <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakecharacteristics$lake_glaciatedlatewisc))==as.character(as.numeric("NA"))),NA,lakecharacteristics$lake_glaciatedlatewisc))
+
+
+# Observed issues when reading the data. An empty list is good!
+problems(lakecharacteristics) 
+# Here is the structure of the input data tibble: 
+glimpse(lakecharacteristics) 
+# And some statistical summaries of the data 
+summary(lakecharacteristics) 
+# Get more details on character variables
+
+
+#LAGOS-US DEPTH
+#Stachelek, J., L.K. Rodriguez, J. Díaz Vázquez, A. Hawkins, E. Phillips, A. Shoffner, I.M. McCullough, K.B. King, J. Namovich, L.A. Egedy, M. Haite, P.J. Hanly, K.E. Webster, K.S. Cheruvelil, and P.A. Soranno. 2021. LAGOS-US DEPTH v1.0: Data module of observed maximum and mean lake depths for a subset of lakes in the conterminous U.S. ver 1. Environmental Data Initiative. https://doi.org/10.6073/pasta/64ddc4d04661d9aef4bd702dc5d8984f (Accessed 2022-03-09).
+infile1 <- trimws("https://pasta.lternet.edu/package/data/eml/edi/1043/1/f6ffb2325156008edffbea5b6c1ea24c") 
+infile1 <-sub("^https","http",infile1)
+# This creates a tibble named: lakedepth 
+	lakedepth <-read_delim(infile1  
+                ,delim=","   
+                ,skip=1 
+                    ,quote='"'  
+                    , col_names=c( 
+                        "lagoslakeid",   
+                        "lake_namegnis",   
+                        "lake_states",   
+                        "lake_depth_state",   
+                        "lake_lat_decdeg",   
+                        "lake_lon_decdeg",   
+                        "lake_maxdepth_m",   
+                        "lake_meandepth_m",   
+                        "lake_waterarea_ha",   
+                        "lake_depth_sourcename",   
+                        "lake_depth_sourceurl",   
+                        "lake_maxdepth_effort",   
+                        "lake_meandepth_effort"   ), 
+                    col_types=list(
+                        col_number() ,  
+                        col_character(),  
+                        col_character(),  
+                        col_character(), 
+                        col_number() , 
+                        col_number() , 
+                        col_number() , 
+                        col_number() , 
+                        col_number() ,  
+                        col_character(),  
+                        col_character(),  
+                        col_character(),  
+                        col_character()), 
+                        na=c(" ",".","NA")  )
+                        
+                    
+# Convert Missing Values to NA for individual vectors 
+lakedepth$lake_namegnis <- ifelse((trimws(as.character(lakedepth$lake_namegnis))==trimws("NULL")),NA,lakedepth$lake_namegnis)               
+suppressWarnings(lakedepth$lake_namegnis <- ifelse(!is.na(as.numeric("NULL")) & (trimws(as.character(lakedepth$lake_namegnis))==as.character(as.numeric("NULL"))),NA,lakedepth$lake_namegnis))
+lakedepth$lake_maxdepth_m <- ifelse((trimws(as.character(lakedepth$lake_maxdepth_m))==trimws("NA")),NA,lakedepth$lake_maxdepth_m)               
+suppressWarnings(lakedepth$lake_maxdepth_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakedepth$lake_maxdepth_m))==as.character(as.numeric("NA"))),NA,lakedepth$lake_maxdepth_m))
+lakedepth$lake_meandepth_m <- ifelse((trimws(as.character(lakedepth$lake_meandepth_m))==trimws("NA")),NA,lakedepth$lake_meandepth_m)               
+suppressWarnings(lakedepth$lake_meandepth_m <- ifelse(!is.na(as.numeric("NA")) & (trimws(as.character(lakedepth$lake_meandepth_m))==as.character(as.numeric("NA"))),NA,lakedepth$lake_meandepth_m))
+lakedepth$lake_depth_sourcename <- ifelse((trimws(as.character(lakedepth$lake_depth_sourcename))==trimws("NULL")),NA,lakedepth$lake_depth_sourcename)               
+suppressWarnings(lakedepth$lake_depth_sourcename <- ifelse(!is.na(as.numeric("NULL")) & (trimws(as.character(lakedepth$lake_depth_sourcename))==as.character(as.numeric("NULL"))),NA,lakedepth$lake_depth_sourcename))
+lakedepth$lake_depth_sourceurl <- ifelse((trimws(as.character(lakedepth$lake_depth_sourceurl))==trimws("NULL")),NA,lakedepth$lake_depth_sourceurl)               
+suppressWarnings(lakedepth$lake_depth_sourceurl <- ifelse(!is.na(as.numeric("NULL")) & (trimws(as.character(lakedepth$lake_depth_sourceurl))==as.character(as.numeric("NULL"))),NA,lakedepth$lake_depth_sourceurl))
+lakedepth$lake_meandepth_effort <- ifelse((trimws(as.character(lakedepth$lake_meandepth_effort))==trimws("NULL")),NA,lakedepth$lake_meandepth_effort)               
+suppressWarnings(lakedepth$lake_meandepth_effort <- ifelse(!is.na(as.numeric("NULL")) & (trimws(as.character(lakedepth$lake_meandepth_effort))==as.character(as.numeric("NULL"))),NA,lakedepth$lake_meandepth_effort))
+                    
+                
+# Observed issues when reading the data. An empty list is good!
+problems(lakedepth) 
+# Here is the structure of the input data tibble: 
+glimpse(lakedepth) 
+# And some statistical summaries of the data 
+summary(lakedepth) 
+# Get more details on character variables
+     
+
+
+
+
+
+
+
+colnames<-(intersect( colnames(lakezones),  colnames(lakecharacteristics))) #identify common columns between dfs
+lagos <- full_join(lakezones, lakecharacteristics, by=colnames)
+colnames<-(intersect( colnames(lagos),  colnames(lakedepth))) #identify common columns between dfs
+lagos <- left_join(lagos, lakedepth, by=colnames)
+lagos <- left_join(lagos, lake_descriptor %>%
+                            select(Hylak_id, lagoslakeid), by="lagoslakeid")
+
+
+save(lakezones, lakecharacteristics, lakedepth, lagos, file = 'data/lakezones.RData')
 ```
