@@ -610,7 +610,7 @@ covariates<-blue_green_2018 %>%
     mutate(Description=NA) %>%
     mutate(Description=
            ifelse(skim_variable=="precip", "mean monthly precipitation (mm)", 
-           ifelse(skim_variable=="air_temp","mean annual air temperature (°C)", 
+           ifelse(skim_variable=="air_temp","mean annual air temperature (°C)",
            ifelse(skim_variable=="area", "lake surface area (km2)",
            ifelse(skim_variable=="elev", "lake elevation (m)",
            ifelse(skim_variable=="pop_sum", "total human population",
