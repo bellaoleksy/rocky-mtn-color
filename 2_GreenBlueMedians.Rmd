@@ -248,7 +248,7 @@ tm_shape(states) +
   tm_borders(lwd = 1,
              col = 'black') + 
 tm_shape(site_cols) + 
-  tm_bubbles(size = .2,
+  tm_bubbles(size = .075,
              col = 'color',
              border.col = 'black',
              border.lwd = 1,
