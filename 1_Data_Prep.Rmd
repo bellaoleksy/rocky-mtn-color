@@ -289,7 +289,7 @@ lakeCat <- read_feather('data/lakeCatExport.feather') #Updated lakeCat export 20
 #could remove lake_waterarea_ha and lake_totalarea_ha columns if those exist elsewhere
 
 
-### LInking above through lagos lake_link
+### Linking above through lagos lake_link
 lake_descriptor <- nhd_hylak %>%
   inner_join(lake_link, by = c('comid' = 'nhdplusv2_comid')) %>%
   inner_join(lakeCat) %>%
