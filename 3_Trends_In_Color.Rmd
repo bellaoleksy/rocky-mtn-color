@@ -622,6 +622,56 @@ ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
   plot_layout(widths = c(1, 0.6))
 dev.off()
 
+
+##EXPORT FOR BOULDER JOB TALK
+png(filename = 'figs/Trend Examples Wide.png',
+    width = 10,
+    height = 4,
+    res = 600,
+    units = 'in')
+ggplot() + 
+  geom_rect(data = bg.fui, 
+            aes(ymin = ymin, ymax = ymax, xmin = -5, xmax = 100, fill = color)) + 
+  scale_fill_identity() + 
+  theme_few() +
+  scale_x_continuous(expand = c(0, 0))+
+  scale_y_continuous(expand = c(0, 0), position="right")+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.title.y=element_blank(),
+        plot.title=element_blank(),
+        plot.subtitle=element_blank(),
+        plot.background = element_rect(fill="#FFFFFF")) +
+ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
+  geom_abline(aes(intercept = intercept, slope = slope), color="grey50", size=0.1, alpha=0.5) + #background Sen's slopes
+  geom_abline(data = full_spec, 
+              aes(intercept = intercept, slope = slope, color=Trend),
+              size=1) + #Sen's slope for selected sites
+  geom_point(data = full_spec, aes(fill=Trend), shape=21) + 
+  scale_fill_manual(values=trendColors)+
+  scale_color_manual(values=trendColors)+
+  geom_text(x = 1990, y = 585,
+            aes(group=Trend, label = paste("n =",n)),
+            color="black",
+            data = trend_labels, size=3)+ #Add label for sample size
+  geom_text(x = 1990, y = 581,
+            aes(group=Trend, label = paste(perc,"%")),
+            color="black",
+            data = trend_labels, size=3)+ #Add label for sample size
+  scale_x_continuous(breaks=seq(1986, 2018, 6))+
+  scale_y_continuous(breaks=seq(500, 575, 25))+
+  facet_wrap(~Trend, ncol=5) + 
+  theme_few()+
+  theme(legend.position="none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        plot.margin = unit(c(0,0.2,0,0), "cm"),)+
+  labs(y="Dominant wavelength (nm)",
+       x="Year") +
+   plot_layout(widths = c(0.1, 0.9))
+dev.off()
+
 ```
 
 ###~~ Stats for MS
@@ -1460,6 +1510,175 @@ ggplot() +
   #                    name="Lake size")
 dev.off()
 ```
+
+```{r}
+
+## SAME AS ABOVE BUT WHOLE WESTERN U.S. for CU JOB TALK
+load('data/lakezones.RData')
+
+#Look at ALL the lakes in the study region
+lakezones_studyregion <- lakezones %>%
+  select(lagoslakeid, lake_namegnis, lake_centroidstate, lake_elevation_m) %>%
+  inner_join(lakecharacteristics)  %>%
+  inner_join(lagos %>% select(lagoslakeid, lake_lat_decdeg, lake_lon_decdeg)) %>%
+  filter(lake_centroidstate %in% c('CO','UT','WY','MT','NM','ID','NV',
+                                   'CA','WA','OR','AZ')) 
+  # filter(lake_elevation_m >= 1400)
+
+hist(log10(lakezones_studyregion$lake_totalarea_ha))
+
+# How many of the lakes are >10 ha in surface area?
+lakezones_studyregion %>%
+  filter(lake_waterarea_ha >= 10) %>%
+  count()
+
+
+
+#What proportion of lakes in the regions are small (<10 ha but <4ha) or large (>10 ha)
+lakezones_studyregion <- lakezones_studyregion %>%
+  filter(lake_waterarea_ha >= 4) %>%
+  mutate(
+    size_class = case_when(
+      lake_waterarea_ha <= 4  ~ '≤ 4 ha',
+      lake_waterarea_ha >= 4 &  lake_waterarea_ha < 10 ~ '4-10 ha',
+      TRUE ~ "> 10 ha"
+    )
+  )
+
+# Total number of lakes in the study region
+total_lakes_region<-lakezones_studyregion %>%  
+  count()
+total_lakes_region
+
+#How many small lakes are over 1600 m?
+lakezones_studyregion %>%
+  filter(lake_elevation_m > 1600) %>%
+  group_by(size_class) %>%
+  count()
+
+# Total lakes either small (4-10 ha) or large (> 10 ha) 
+lake_size_proportions<-lakezones_studyregion %>%  
+  group_by(size_class) %>%
+  count()
+lake_size_proportions
+
+
+#Ok, wow. So the proportion of total lakes that are large is:
+lake_size_proportions[1,2]/(total_lakes_region)
+#Alternatively, the proportion of total lakes that are small (4-10) is:
+lake_size_proportions[2,2]/(total_lakes_region)
+
+
+#Histograms
+png(filename = 'figs/lake_size_hist.png',
+    width = 8, height = 2, units = 'in', res = 600)
+elev_lakesize_hist<-ggpubr::gghistogram(lakezones_studyregion %>%
+                     mutate(lake_waterarea_ha=log10(lake_waterarea_ha)), x = "lake_elevation_m",
+   add = "median",
+   rug = FALSE,
+   bins=50,
+   # facet.by = "size_class",
+   ylab ="Count",
+   xlab ="Lake elevation (m)",
+   color = "size_class", fill = "size_class",
+   palette = c("#9b2226","#005f73"),
+   ggtheme = theme_few())+
+  theme(legend.position = "none")
+elev_lakesize_hist
+dev.off()
+
+## MAP of small lakes and large lakes
+# library("sf")
+# library("rnaturalearth")
+# library("rnaturalearthdata")
+# library("ggspatial")
+# library(raster)
+# library(tidytext)
+# if (!require('nhdplusTools')) install.packages('nhdplusTools'); library('nhdplusTools')
+# if (!require('maps')) install.packages('maps'); library('maps')
+
+lakezones_studyregion_sf = st_as_sf(lakezones_studyregion, coords = c("lake_lon_decdeg", "lake_lat_decdeg"), 
+                 crs = 4326, agr = "constant")
+
+
+buffer_box <- st_bbox(lakezones_studyregion_sf) %>%
+  st_as_sfc(.) %>%
+  st_buffer(50000) %>%
+  st_bbox()
+
+ras <- get_elev_raster(site_cols, z = 5) %>%
+  raster::crop(.,buffer_box)
+
+ras[ras < 0] <- 0
+slope <- terrain(ras, 'slope')
+aspect <- terrain(ras, 'aspect')
+
+hil <- hillShade(slope, aspect)
+
+states <- USAboundaries::us_states()
+
+
+hil_df <- as.data.frame(hil, xy = TRUE) 
+
+library(elevatr)
+# remotes::install_github("wmgeolab/rgeoboundaries")
+library(rgeoboundaries)
+elevation_data <- get_elev_raster(locations = states, z = 5, clip = "locations")
+elevation_data <- as.data.frame(elevation_data, xy = TRUE)
+colnames(elevation_data)[3] <- "elevation"
+# remove rows of data frame with one or more NA's,using complete.cases
+elevation_data <- elevation_data[complete.cases(elevation_data), ]
+
+
+elevation_colors <- terrain.colors(6)
+
+png(filename = 'figs/lake_size_map_WUS_all.png',
+    width = 8, height = 9, units = 'in', res = 600)
+ggplot() +
+    geom_polygon(
+    data = map_data("state"),
+    aes(x = long, y = lat, group = group),
+    fill = "white",
+    color = "black",
+    size = .5,
+    alpha = 0
+  ) +
+  # geom_tile(data = elevation_data, aes(x = x, y = y, fill = elevation)) +
+  coord_sf(
+    xlim = c(-125.63435,-101.14872),
+    ylim = c(30.77671, 50.16259),
+    expand = FALSE
+  ) + #values from buffer_box
+  # geom_raster(data = hil_df,
+  #             aes(x = x, y = y, alpha = layer), show.legend=FALSE) +
+  # scale_fill_gradientn(colors = terrain.colors(5))+
+  labs(
+    # title="All lakes >1 ha in the WUS region",
+       # subtitle="There are 54,286 lakes total, and only 14% (n=7693) are > 10 ha in size",
+       x = "Longitude", y = "Latitude")+
+  geom_point(
+    data = lakezones_studyregion ,
+    aes(lake_lon_decdeg, lake_lat_decdeg, color=size_class, shape = size_class),
+    size = 0.75,
+    # color="black",
+    # fill=NA,
+    alpha = 0.5
+  ) +
+  scale_color_manual(
+                    values=c("#022f40","#005f73"),
+                     name="Lake size")+
+  scale_shape_manual(values=c(16,17),
+                     name="Lake size")+
+  guides(color = guide_legend(override.aes=list(size=3,alpha=1)),
+         fill = guide_colourbar(barwidth = 12, barheight = 0.5)) +
+    theme_few()+
+  theme(legend.position="bottom")
+
+  # scale_shape_manual(values=c(21,25),
+  #                    name="Lake size")
+dev.off()
+```
+
 
 ### Figure 4A. DWL trend map (continuous)
 
