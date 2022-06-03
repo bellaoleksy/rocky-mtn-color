@@ -285,7 +285,7 @@ dev.off()
 ```
 
 
-### Blue Green Category Only Map
+### Figure S1. Blue Green Category Only Map
 
 ```{r}
 
