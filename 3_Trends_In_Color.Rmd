@@ -68,7 +68,7 @@ co_summary <- ls_co %>%
          doy <= 258) %>% #Sept 14/15
   group_by(Hylak_id,year) %>%
   add_count() %>%
-  filter(year >= 1984) %>% #changed to >= so we don't drop 1984... 
+  filter(year >= 1984) %>% 
   filter(n >= 3) %>% # at least 3 observations per year
   group_by(Hylak_id) %>%
   mutate(unique_years = n_distinct(year)) %>%
@@ -85,7 +85,7 @@ co_summary <- ls_co %>%
                    .names = "{.col}-{.fn}"))%>%
   ungroup() %>%
   as_tsibble(., key = Hylak_id, index=year) %>% #time series tibble
-  fill_gaps() %>% #imputing, though not sure what's going on under the hood
+  fill_gaps() %>% 
   as_tibble() %>%
   pivot_longer(cols = `Blue-mean`:`dWL-median`,
                names_to = c('var','stat'),
@@ -473,29 +473,7 @@ trend_plotter <- function(study_lakes = high_lakes,
                               Trend == "Green -> Bluer" & group == "Blue/clear" ~ "Change to Blue/clear",
                               TRUE ~ "No net change")
     )
-  
-  #OLD-- can delete at this point 
-  # sens_sum = unnest(co_mods, c(sens_sum, slope, early_mean)) %>%
-    # mutate(
-    #   Trend = case_when(
-    #     p.value <= 0.05 & slope >= 0 & early_mean < 530 ~ 'Blue -> Green',
-    #     p.value <= 0.05 & slope >= 0 & early_mean >= 530 ~ 'Intensifying Green/Yellow',
-    #     p.value <= 0.05 & slope <= 0 & early_mean > 530 ~ 'Green -> Blue',
-    #     p.value <= 0.05 & slope <= 0 & early_mean < 530 ~ 'Intensifying Blue',
-    #     p.value > 0.05 ~ 'No trend'
-    #   ),
-    #   Trend = factor(
-    #     Trend,
-    #     levels = c(
-    #       'No trend',
-    #       'Intensifying Blue',
-    #       'Green -> Blue',
-    #       'Intensifying Green/Yellow',
-    #       'Blue -> Green'
-    #     )
-    #   )
-    # )
-  
+
   
   plot <- ggplot(sens_sum %>%
                    dplyr::filter(stat != 'sd'),
@@ -542,8 +520,6 @@ dwl_all <- dwl %>%
 set.seed(123654)
 
 dwl_specials <- dwl_all %>%
-  # filter(abs(slope) >= 1 | Trend == 'No trend') %>%
-  # filter(p.value < 0.05 | Trend == 'No trend') %>% # Had to change from 0.001 to 0.05 to get a blue->green example lake
   filter(abs(slope) >= 1 &
            p.value < 0.05) %>% #I think it would be better to not show a trend line for "No Trend"
   group_by(Trend) %>%
@@ -623,54 +599,54 @@ ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
 dev.off()
 
 
-##EXPORT FOR BOULDER JOB TALK
-png(filename = 'figs/Trend Examples Wide.png',
-    width = 10,
-    height = 4,
-    res = 600,
-    units = 'in')
-ggplot() + 
-  geom_rect(data = bg.fui, 
-            aes(ymin = ymin, ymax = ymax, xmin = -5, xmax = 100, fill = color)) + 
-  scale_fill_identity() + 
-  theme_few() +
-  scale_x_continuous(expand = c(0, 0))+
-  scale_y_continuous(expand = c(0, 0), position="right")+
-  theme(axis.text.x=element_blank(),
-        axis.ticks.x=element_blank(),
-        axis.ticks.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.title.y=element_blank(),
-        plot.title=element_blank(),
-        plot.subtitle=element_blank(),
-        plot.background = element_rect(fill="#FFFFFF")) +
-ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
-  geom_abline(aes(intercept = intercept, slope = slope), color="grey50", size=0.1, alpha=0.5) + #background Sen's slopes
-  geom_abline(data = full_spec, 
-              aes(intercept = intercept, slope = slope, color=Trend),
-              size=1) + #Sen's slope for selected sites
-  geom_point(data = full_spec, aes(fill=Trend), shape=21) + 
-  scale_fill_manual(values=trendColors)+
-  scale_color_manual(values=trendColors)+
-  geom_text(x = 1990, y = 585,
-            aes(group=Trend, label = paste("n =",n)),
-            color="black",
-            data = trend_labels, size=3)+ #Add label for sample size
-  geom_text(x = 1990, y = 581,
-            aes(group=Trend, label = paste(perc,"%")),
-            color="black",
-            data = trend_labels, size=3)+ #Add label for sample size
-  scale_x_continuous(breaks=seq(1986, 2018, 6))+
-  scale_y_continuous(breaks=seq(500, 575, 25))+
-  facet_wrap(~Trend, ncol=5) + 
-  theme_few()+
-  theme(legend.position="none",
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-        plot.margin = unit(c(0,0.2,0,0), "cm"),)+
-  labs(y="Dominant wavelength (nm)",
-       x="Year") +
-   plot_layout(widths = c(0.1, 0.9))
-dev.off()
+## A horizontal verzion with DWL mapped alongside y-axis for presentations
+# png(filename = 'figs/Trend Examples Wide.png',
+#     width = 10,
+#     height = 4,
+#     res = 600,
+#     units = 'in')
+# ggplot() + 
+#   geom_rect(data = bg.fui, 
+#             aes(ymin = ymin, ymax = ymax, xmin = -5, xmax = 100, fill = color)) + 
+#   scale_fill_identity() + 
+#   theme_few() +
+#   scale_x_continuous(expand = c(0, 0))+
+#   scale_y_continuous(expand = c(0, 0), position="right")+
+#   theme(axis.text.x=element_blank(),
+#         axis.ticks.x=element_blank(),
+#         axis.ticks.y=element_blank(),
+#         axis.text.y=element_blank(),
+#         axis.title.y=element_blank(),
+#         plot.title=element_blank(),
+#         plot.subtitle=element_blank(),
+#         plot.background = element_rect(fill="#FFFFFF")) +
+# ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
+#   geom_abline(aes(intercept = intercept, slope = slope), color="grey50", size=0.1, alpha=0.5) + #background Sen's slopes
+#   geom_abline(data = full_spec, 
+#               aes(intercept = intercept, slope = slope, color=Trend),
+#               size=1) + #Sen's slope for selected sites
+#   geom_point(data = full_spec, aes(fill=Trend), shape=21) + 
+#   scale_fill_manual(values=trendColors)+
+#   scale_color_manual(values=trendColors)+
+#   geom_text(x = 1990, y = 585,
+#             aes(group=Trend, label = paste("n =",n)),
+#             color="black",
+#             data = trend_labels, size=3)+ #Add label for sample size
+#   geom_text(x = 1990, y = 581,
+#             aes(group=Trend, label = paste(perc,"%")),
+#             color="black",
+#             data = trend_labels, size=3)+ #Add label for sample size
+#   scale_x_continuous(breaks=seq(1986, 2018, 6))+
+#   scale_y_continuous(breaks=seq(500, 575, 25))+
+#   facet_wrap(~Trend, ncol=5) + 
+#   theme_few()+
+#   theme(legend.position="none",
+#         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+#         plot.margin = unit(c(0,0.2,0,0), "cm"),)+
+#   labs(y="Dominant wavelength (nm)",
+#        x="Year") +
+#    plot_layout(widths = c(0.1, 0.9))
+# dev.off()
 
 ```
 
@@ -1511,174 +1487,6 @@ ggplot() +
 dev.off()
 ```
 
-```{r}
-
-## SAME AS ABOVE BUT WHOLE WESTERN U.S. for CU JOB TALK
-load('data/lakezones.RData')
-
-#Look at ALL the lakes in the study region
-lakezones_studyregion <- lakezones %>%
-  select(lagoslakeid, lake_namegnis, lake_centroidstate, lake_elevation_m) %>%
-  inner_join(lakecharacteristics)  %>%
-  inner_join(lagos %>% select(lagoslakeid, lake_lat_decdeg, lake_lon_decdeg)) %>%
-  filter(lake_centroidstate %in% c('CO','UT','WY','MT','NM','ID','NV',
-                                   'CA','WA','OR','AZ')) 
-  # filter(lake_elevation_m >= 1400)
-
-hist(log10(lakezones_studyregion$lake_totalarea_ha))
-
-# How many of the lakes are >10 ha in surface area?
-lakezones_studyregion %>%
-  filter(lake_waterarea_ha >= 10) %>%
-  count()
-
-
-
-#What proportion of lakes in the regions are small (<10 ha but <4ha) or large (>10 ha)
-lakezones_studyregion <- lakezones_studyregion %>%
-  filter(lake_waterarea_ha >= 4) %>%
-  mutate(
-    size_class = case_when(
-      lake_waterarea_ha <= 4  ~ '≤ 4 ha',
-      lake_waterarea_ha >= 4 &  lake_waterarea_ha < 10 ~ '4-10 ha',
-      TRUE ~ "> 10 ha"
-    )
-  )
-
-# Total number of lakes in the study region
-total_lakes_region<-lakezones_studyregion %>%  
-  count()
-total_lakes_region
-
-#How many small lakes are over 1600 m?
-lakezones_studyregion %>%
-  filter(lake_elevation_m > 1600) %>%
-  group_by(size_class) %>%
-  count()
-
-# Total lakes either small (4-10 ha) or large (> 10 ha) 
-lake_size_proportions<-lakezones_studyregion %>%  
-  group_by(size_class) %>%
-  count()
-lake_size_proportions
-
-
-#Ok, wow. So the proportion of total lakes that are large is:
-lake_size_proportions[1,2]/(total_lakes_region)
-#Alternatively, the proportion of total lakes that are small (4-10) is:
-lake_size_proportions[2,2]/(total_lakes_region)
-
-
-#Histograms
-png(filename = 'figs/lake_size_hist.png',
-    width = 8, height = 2, units = 'in', res = 600)
-elev_lakesize_hist<-ggpubr::gghistogram(lakezones_studyregion %>%
-                     mutate(lake_waterarea_ha=log10(lake_waterarea_ha)), x = "lake_elevation_m",
-   add = "median",
-   rug = FALSE,
-   bins=50,
-   # facet.by = "size_class",
-   ylab ="Count",
-   xlab ="Lake elevation (m)",
-   color = "size_class", fill = "size_class",
-   palette = c("#9b2226","#005f73"),
-   ggtheme = theme_few())+
-  theme(legend.position = "none")
-elev_lakesize_hist
-dev.off()
-
-## MAP of small lakes and large lakes
-# library("sf")
-# library("rnaturalearth")
-# library("rnaturalearthdata")
-# library("ggspatial")
-# library(raster)
-# library(tidytext)
-# if (!require('nhdplusTools')) install.packages('nhdplusTools'); library('nhdplusTools')
-# if (!require('maps')) install.packages('maps'); library('maps')
-
-lakezones_studyregion_sf = st_as_sf(lakezones_studyregion, coords = c("lake_lon_decdeg", "lake_lat_decdeg"), 
-                 crs = 4326, agr = "constant")
-
-
-buffer_box <- st_bbox(lakezones_studyregion_sf) %>%
-  st_as_sfc(.) %>%
-  st_buffer(50000) %>%
-  st_bbox()
-
-ras <- get_elev_raster(site_cols, z = 5) %>%
-  raster::crop(.,buffer_box)
-
-ras[ras < 0] <- 0
-slope <- terrain(ras, 'slope')
-aspect <- terrain(ras, 'aspect')
-
-hil <- hillShade(slope, aspect)
-
-states <- USAboundaries::us_states()
-
-
-hil_df <- as.data.frame(hil, xy = TRUE) 
-
-library(elevatr)
-# remotes::install_github("wmgeolab/rgeoboundaries")
-library(rgeoboundaries)
-elevation_data <- get_elev_raster(locations = states, z = 5, clip = "locations")
-elevation_data <- as.data.frame(elevation_data, xy = TRUE)
-colnames(elevation_data)[3] <- "elevation"
-# remove rows of data frame with one or more NA's,using complete.cases
-elevation_data <- elevation_data[complete.cases(elevation_data), ]
-
-
-elevation_colors <- terrain.colors(6)
-
-png(filename = 'figs/lake_size_map_WUS_all.png',
-    width = 8, height = 9, units = 'in', res = 600)
-ggplot() +
-    geom_polygon(
-    data = map_data("state"),
-    aes(x = long, y = lat, group = group),
-    fill = "white",
-    color = "black",
-    size = .5,
-    alpha = 0
-  ) +
-  # geom_tile(data = elevation_data, aes(x = x, y = y, fill = elevation)) +
-  coord_sf(
-    xlim = c(-125.63435,-101.14872),
-    ylim = c(30.77671, 50.16259),
-    expand = FALSE
-  ) + #values from buffer_box
-  # geom_raster(data = hil_df,
-  #             aes(x = x, y = y, alpha = layer), show.legend=FALSE) +
-  # scale_fill_gradientn(colors = terrain.colors(5))+
-  labs(
-    # title="All lakes >1 ha in the WUS region",
-       # subtitle="There are 54,286 lakes total, and only 14% (n=7693) are > 10 ha in size",
-       x = "Longitude", y = "Latitude")+
-  geom_point(
-    data = lakezones_studyregion ,
-    aes(lake_lon_decdeg, lake_lat_decdeg, color=size_class, shape = size_class),
-    size = 0.75,
-    # color="black",
-    # fill=NA,
-    alpha = 0.5
-  ) +
-  scale_color_manual(
-                    values=c("#022f40","#005f73"),
-                     name="Lake size")+
-  scale_shape_manual(values=c(16,17),
-                     name="Lake size")+
-  guides(color = guide_legend(override.aes=list(size=3,alpha=1)),
-         fill = guide_colourbar(barwidth = 12, barheight = 0.5)) +
-    theme_few()+
-  theme(legend.position="bottom")
-
-  # scale_shape_manual(values=c(21,25),
-  #                    name="Lake size")
-dev.off()
-```
-
 
 ### Figure 4A. DWL trend map (continuous)
 
@@ -1715,43 +1523,6 @@ tm_shape(dwl_map) +
              alpha = 0.8,
              # jitter = .3,
              palette = c('gray20','#1f78b4','#a6cee3','#33a02c','#b2df8a')) +
-tm_legend(legend.position = c(0,0),
-            legend.bg.color = 'gray90',
-            legend.frame = 'black') 
-dev.off()
-```
-
-###Figure S1. DWL trend map (categorical)
-```{r}
-
-## Look JUST a lakes that are going from blue->green
-dwl_map_BG <- dwl %>%
-  filter(stat == 'median') %>%
-  dplyr::select(Hylak_id,Trend) %>%
-  inner_join(site_cols,.) %>%
-  arrange(Trend) %>%
-  filter(Trend=="Blue -> Green")
-
-tm_shape(hil) +
-  tm_raster(palette = gray(0:10 / 10), style = "cont", legend.show = FALSE) + 
-tm_shape(ras) + 
-  tm_raster(alpha = 0.2,
-            style = 'cont',
-            title = 'Elevation (m)',
-            palette = 'Greys',
-            legend.show = FALSE) + 
-tm_shape(states) + 
-  tm_borders(lwd = 1,
-             col = 'black') + 
-tm_shape(dwl_map_BG) + 
-    tm_bubbles(size = .2,
-             col = 'Trend',
-             shape=21,
-             border.col = 'black',
-             border.lwd = 1,
-             alpha = 0.8,
-             # jitter = .3,
-             palette = c('#b2df8a')) +
 tm_legend(legend.position = c(0,0),
             legend.bg.color = 'gray90',
             legend.frame = 'black') 
@@ -1814,9 +1585,9 @@ dev.off()
 ```
 
 
-## DWL Trends -- WHY?
+###  DWL Trends -- WHY?
 
-### (0) Random forest
+#### Random forest
 
 ```{r}
 #A preliminary analysis showed RF outperformed MLR so I'm going with it. 
@@ -1854,7 +1625,7 @@ library(themis)
 
 
 set.seed(123)
-split_d <- initial_split(trends_df, strata = Trend_new, prop=0.6)
+split_d <- initial_split(trends_df, strata = Trend_new, prop=0.66)
 train_d <- training(split_d)%>%  mutate_if(is.numeric, round, digits=2) 
 test_d<- testing(split_d)%>%  mutate_if(is.numeric, round, digits=2) 
 ## I doubled checked and at least 25% of each Trend group is set aside for validation
@@ -1911,12 +1682,11 @@ rf_auc <-
   collect_predictions(parameters = rf_best) %>% 
   roc_curve(Trend_new, .pred_Negative:.pred_Positive) %>% 
   mutate(model = "Random Forest") 
-#THE LAST FIT
 
 #So start by rebuilding parsnip model object from scratch and add a new argument (impurity) to get VI scores
 # the last model
 last_rf_mod <- 
-  rand_forest(mtry = 5, min_n = 3, trees = 1000) %>% 
+  rand_forest(mtry = 4, min_n = 3, trees = 1000) %>% 
   set_engine("ranger", num.threads = cores, importance = "impurity") %>% 
   set_mode("classification")
 
@@ -2069,28 +1839,6 @@ VI_winterppt<-vip_plot$data %>%  pluck(2,3)
 VI_urban<-vip_plot$data %>%  pluck(2,4)
 VI_springtemp<-vip_plot$data %>%  pluck(2,5)
 
-# A <- vip_plot$data %>%
-#   mutate(
-#     Variable = replace(Variable, Variable %in% c("elev"), "Elevation"),
-#     Variable = replace(Variable, Variable %in% c("perc_urban"), "% Urban"),
-#     Variable = replace(Variable, Variable %in% c("slope_winter_ppt_mm"), "Change in winter\nprecip. (mm/year)"),
-#     Variable = replace(Variable, Variable %in% c("pop_sum"), "Human pop."),
-#     Variable = replace(Variable, Variable %in% c("LSA"), "Lake surface area")
-#   ) %>%
-#   ggplot(aes(
-#     x = Importance,
-#     y = forcats::fct_reorder(Variable, Importance, .desc = TRUE)
-#   )) +
-#   geom_bar(color="black",fill="grey50", width=0.75, position = "dodge", stat = "identity") +
-#   labs(x = "Importance\n(Mean Decr. Accuracy)") +
-#   theme_few() +
-#   theme(axis.title.y = element_blank(),
-#             axis.text.y = element_text(size=9))+
-#   scale_x_continuous(limits=c(0,8))
-
-
-
-
 #Human population
 med_noTrend <-
   trends_df %>% filter(Trend_new == "No trend") %>% summarize(median(pop_sum+0.1)) %>%
@@ -2229,36 +1977,9 @@ eff <- ggplot(trends_df, aes(x = Trend_new, y = slope_spring_tmean_degC, fill = 
 
 
 
-
-# layout <- "
-# AABBCC
-# DDEEFF
-# "
-# 
-# 
-# A + B + C + D + E + F + 
-#   plot_annotation(tag_levels = 'A') +
-#   plot_layout(
-#     design = layout,
-#     guides = "collect",
-#     heights = c(0.4, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6)
-#   ) & theme(legend.position = 'none',
-#             legend.text = element_text(size=9))
-
-# layout <- "
-# BBCCDD
-# #EEFF#
-# "
-
 (B / C / D / E / eff) + 
   plot_annotation(tag_levels = 'A')  & theme(legend.position = 'none',
             legend.text = element_text(size=9))
-  # plot_layout(
-  #   design = layout,
-  #   guides = "collect",
-  #   widths = c(0.33,0.33,0.33,
-  #              0.50,0.50)
-
 
 dev.off()
 
@@ -2266,219 +1987,6 @@ dev.off()
 
 ```
 
-
-
-####~Alt version with Trend colors
-```{r}
-
-
-png(
-  filename = 'figs/RF_results_alt.png',
-  width = 4,
-  height = 12,
-  res = 600,
-  units = 'in'
-)
-
-#Extract VI scores for plot labels
-VI_pop_sum <-vip_plot$data %>%  pluck(2,1)
-VI_elev <-vip_plot$data %>%  pluck(2,2)
-VI_winterppt<-vip_plot$data %>%  pluck(2,3)
-VI_urban<-vip_plot$data %>%  pluck(2,4)
-VI_springtemp<-vip_plot$data %>%  pluck(2,5)
-
-# A <- vip_plot$data %>%
-#   mutate(
-#     Variable = replace(Variable, Variable %in% c("elev"), "Elevation"),
-#     Variable = replace(Variable, Variable %in% c("perc_urban"), "% Urban"),
-#     Variable = replace(Variable, Variable %in% c("slope_winter_ppt_mm"), "Change in winter\nprecip. (mm/year)"),
-#     Variable = replace(Variable, Variable %in% c("pop_sum"), "Human pop."),
-#     Variable = replace(Variable, Variable %in% c("LSA"), "Lake surface area")
-#   ) %>%
-#   ggplot(aes(
-#     x = Importance,
-#     y = forcats::fct_reorder(Variable, Importance, .desc = TRUE)
-#   )) +
-#   geom_bar(color="black",fill="grey50", width=0.75, position = "dodge", stat = "identity") +
-#   labs(x = "Importance\n(Mean Decr. Accuracy)") +
-#   theme_few() +
-#   theme(axis.title.y = element_blank(),
-#             axis.text.y = element_text(size=9))+
-#   scale_x_continuous(limits=c(0,8))
-
-
-
-
-#Human population
-med_noTrend <-
-  trends_df %>% filter(Trend_new == "No trend") %>% summarize(median(pop_sum+0.1)) %>%
-  pull()
-B<-  ggplot(trends_df, aes(x = Trend_new, y = pop_sum+0.1, fill = Trend)) +
-  # geom_violin()+
-  geom_boxplot(fill=NA, outlier.shape = NA) +
-  geom_jitter(
-    aes(fill = Trend),
-    shape = 21,
-    size = 1.5,
-    # alpha = 0.6,
-    position = position_jitter(0.2)
-  ) +
-  geom_hline(yintercept = (med_noTrend), linetype = "dashed") +
-  scale_fill_manual(values = trendColors) +
-  # guides(fill = "none") +
-  theme_few() +
-  theme(
-    # axis.text.x = element_blank(),
-    axis.title.x = element_blank(),
-    # axis.ticks.x = element_blank()
-  ) +
-  scale_y_log10(labels = scales::label_number_si(),
-                name = "Total human population")+
-  labs(title=paste0("VI = ", round(VI_pop_sum, 2)))
-
-#Elevation
-med_noTrend <-
-  trends_df %>% filter(Trend_new == "No trend") %>% summarize(median(elev)) %>%
-  pull()
-C <-
-  ggplot(trends_df, aes(x = Trend_new, y = elev, fill = Trend)) +
-  # geom_violin()+
-  geom_boxplot(fill=NA, outlier.shape = NA) +
-  geom_jitter(
-    aes(fill = Trend),
-    shape = 21,
-    size = 1.5,
-    # alpha = 0.6,
-    position = position_jitter(0.2)
-  ) +
-  geom_hline(yintercept = med_noTrend, linetype = "dashed") +
-  scale_fill_manual(values = trendColors) +
-  guides(fill = "none") +
-  theme_few() +
-  theme(
-    # axis.text.x = element_blank(),
-    axis.title.x = element_blank(),
-    # axis.ticks.x = element_blank()
-  ) +
-  labs(y = "Elevation (m)")+
-  labs(title=paste0("VI = ", round(VI_elev, 2)))
-
-#Slope winter ppt
-med_noTrend <-
-  trends_df %>%
-  filter(Trend_new == "No trend") %>%
-  summarize(median(slope_winter_ppt_mm)) %>%
-  pull()
-D <- ggplot(trends_df, aes(x = Trend_new, y = slope_winter_ppt_mm, fill = Trend)) +
-  geom_boxplot(fill=NA, outlier.shape = NA) +
-  geom_jitter(
-    aes(fill = Trend),
-    shape = 21,
-    size = 1.5,
-    # alpha = 0.6,
-    position = position_jitter(0.2)
-  ) +
-  geom_hline(yintercept = med_noTrend, linetype = "dashed") +
-  scale_fill_manual(values = trendColors) +
-  theme_few() +
-  theme(
-    # axis.text.x = element_blank(),
-    axis.title.x = element_blank(),
-    # axis.ticks.x = element_blank()
-  ) +
-  labs(y="Slope of winter precipitation\n1984-2020 (mm/year)")+
-  labs(title=paste0("VI = ", round(VI_winterppt, 2)))
-
-
-#% Urban
-med_noTrend <-
-  trends_df %>% filter(Trend_new == "No trend") %>% summarize(median(perc_urban+0.1)) %>%
-  pull()
-E <-ggplot(trends_df, aes(x = Trend_new, y = perc_urban+0.1, fill = Trend)) +
-  # geom_violin()+
-  geom_boxplot(fill=NA, outlier.shape = NA) +
-  geom_jitter(
-    aes(fill = Trend),
-    shape = 21,
-    size = 1.5,
-    # alpha = 0.6,
-    position = position_jitter(0.2)
-  ) +
-  geom_hline(yintercept = 0.1, linetype = "dashed") +
-  scale_fill_manual(values = trendColors) +
-  guides(fill = "none") +
-  theme_few() +
-  theme(
-    # axis.text.x = element_blank(),
-    axis.title.x = element_blank(),
-    # axis.ticks.x = element_blank()
-  ) +
-  scale_y_log10(labels = scales::label_number(),
-                # expand = c(0,100),
-                name = "% Urban")+
-  labs(title=paste0("VI = ", round(VI_urban, 2)))
-
-#Spring temperature
-#Consider logit transfomation as in Wagner & Schliep
-med_noTrend <-
-  trends_df %>% filter(Trend_new == "No trend") %>% summarize(median(slope_spring_tmean_degC)) %>%
-  pull()
-eff <- ggplot(trends_df, aes(x = Trend_new, y = slope_spring_tmean_degC, fill = Trend)) +
-  geom_boxplot(fill=NA, outlier.shape = NA) +
-  geom_jitter(
-    aes(fill = Trend),
-    shape = 21,
-    size = 1.5,
-    # alpha = 0.6,
-    position = position_jitter(0.2)
-  ) +
-  geom_hline(yintercept = med_noTrend, linetype = "dashed") +
-  scale_fill_manual(values = trendColors) +
-  guides(fill = "none") +
-  theme_few() +
-  theme(
-    # axis.text.x = element_blank(),
-    axis.title.x = element_blank(),
-    # axis.ticks.x = element_blank()
-  ) +
-  labs(y="Change in spring\ntemp. (°C/year)")+
-  labs(title=paste0("VI = ", round(VI_springtemp, 2)))
-
-
-
-
-
-# layout <- "
-# AABBCC
-# DDEEFF
-# "
-# 
-# 
-# A + B + C + D + E + F + 
-#   plot_annotation(tag_levels = 'A') +
-#   plot_layout(
-#     design = layout,
-#     guides = "collect",
-#     heights = c(0.4, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6)
-#   ) & theme(legend.position = 'none',
-#             legend.text = element_text(size=9))
-
-# layout <- "
-# BBCCDD
-# #EEFF#
-# "
-
-(B / C / D / E / eff) + 
-  plot_annotation(tag_levels = 'A')  & theme(legend.position = 'none',
-            legend.text = element_text(size=9))
-  # plot_layout(
-  #   design = layout,
-  #   guides = "collect",
-  #   widths = c(0.33,0.33,0.33,
-  #              0.50,0.50)
-
-dev.off()
-```
 
 #### Figure S3. Boxplot of top 10 RF vars
 
@@ -2833,8 +2341,12 @@ K <- ggplot(trends_df, aes(x = Trend_new, y = population_change+abs(min(populati
 dev.off()
 ``` 
 
-
-
+# .
+# .
+# .
+# .
+# .
+# .
 # ARCHIVE -- OLD -- NOT RUN
 <!-- ### LMER -->
 
