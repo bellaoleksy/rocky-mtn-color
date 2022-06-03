@@ -211,12 +211,12 @@ bg.fui = tibble(
 
 ##Legend only
 png(filename = 'figs/F-U_legend.png',
-    width = 2.0, height = 11.8, units = 'in', res = 600)
+    width = 2, height = 11.8, units = 'in', res = 600)
 
-ggplot() + 
-  geom_rect(data = bg.fui, 
-            aes(ymin = ymin, ymax = ymax, xmin = -5, xmax = 100, fill = color)) + 
-  scale_fill_identity() + 
+ggplot() +
+  geom_rect(data = bg.fui,
+            aes(ymin = ymin, ymax = ymax, xmin = -5, xmax = 100, fill = color)) +
+  scale_fill_identity() +
   theme_few() +
   scale_x_continuous(expand = c(0, 0))+
   scale_y_continuous(expand = c(0, 0), position="right")+
@@ -228,9 +228,28 @@ ggplot() +
         plot.title=element_text(size=28, hjust=0.5),
         plot.subtitle=element_text(size=24, hjust=0.5),
         plot.background = element_rect(fill="#FFFFFF"))
-  # labs(y=" ",
-  #      title="Forel-Ule color",
-  #      subtitle="Dominant\nwavelength (nm)")
+
+#### Horizontal version for talks 
+# ggplot() +
+#   geom_rect(data = bg.fui,
+#             aes(xmin = ymin, xmax = ymax, ymin = -5, ymax = 100, fill = color)) +
+#   scale_fill_identity() +
+#   theme_few() +
+#   scale_x_continuous(expand = c(0, 0))+
+#   scale_y_continuous(expand = c(0, 0), position="right")+
+#   theme(axis.text.y=element_blank(),
+#         axis.ticks.y=element_blank(),
+#         axis.ticks.x=element_line(color="white"),
+#         axis.text.x=element_text(size=18, color="white"),
+#         axis.title.x=element_text(size=18, hjust=0.5, color="white"),
+#         panel.border = element_rect(color="white"),
+#         plot.title=element_text(size=20, hjust=0.5, color="white", face="bold"),
+#         
+#         plot.subtitle=element_text(size=20, hjust=0.5),
+#         plot.background = element_rect(fill="#000000", color="black"))+
+#   labs(x="Dominant wavelength (nm)",
+#        title="Forel-Ule color")
+
 dev.off()
 
 png(filename = 'figs/spatial_color_map_continuous.png',
@@ -302,21 +321,6 @@ dev.off()
 
 
 ```
-
-### Interactive BG map
-
-```{r, eval = F}
-
-
-# str(site_cols)
-# mapviewOptions(fgb = F)
-m1 <- mapview(site_cols, zcol = 'color', col.regions = site_cols$color,
-              legend = F)
-
-mapshot(m1, url = 'figs/lake_color_decade.html')
-
-```
-
 
 ### Why blue, why green?
 
@@ -437,37 +441,6 @@ conf_matrix_plot
 # dev.off()
 
 
-#Old -- Matt's confusion matrix
-# png(filename = 'figs/bg_confusion_matrix.png',
-#     width = 6, height = 5,
-#     units = 'in', res = 300)
-# autoplot(cm, type = "heatmap") +
-#   scale_fill_gradient(low="#D6EAF8",high = "#2E86C1")
-# dev.off()
-
-##Alternative confusion matrix using cvms library, ggplot2 friendly, but irritating to customize
-# conf_mat <- confusion_matrix(targets = test_d$group,
-#                              predictions = test_d$guess)
-# conf_matrix_plot<-plot_confusion_matrix(conf_mat,
-#                       add_counts = TRUE,
-#                       target_col = "Target",
-#                       prediction_col = "Prediction",
-#                       add_row_percentages = FALSE,
-#                       add_col_percentages = FALSE,
-#                       counts_on_top = TRUE,
-#                       tile_border_color = 'black',
-#                       tile_border_linetype = "solid",
-#                       darkness=0.7)+
-#   ggplot2::scale_fill_distiller(palette = "Greys",direction=1)+
-#   ggthemes::theme_few(base_size=18)+
-#   labs(x="Truth",
-#        y="Prediction")
-# conf_matrix_plot
-
-
-
-
-
 ##GGPARTY? Another way
 library(ggparty)
 cart_mod_party<-as.party(cart_mod)
@@ -500,34 +473,11 @@ tree_plot<-ggparty(cart_mod_party) +
   # geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 3.2) 
 tree_plot
 
-## "Your decision tree may be cool, but what if I tell you you can make it hot?" LMAO.
-# https://trang1618.github.io/treeheatr/articles/explore.html
-# library(treeheatr)
-# 
-# # build tree using rpart:
-# x <- partykit::as.party(cart_mod)
-# 
-# tree_plot<-heat_tree(x,
-#           target_lab = 'group',
-#           target_cols = c('#1f78b4','#33a02c'),
-#           feats = NA, 
-#           # feats = c('slope', 'maxdepth', 'WALA', 'air_temp'), #select only features on the tree
-#           # show = 'tree-only',
-#           # cont_legend = TRUE, cate_legend = TRUE,
-#           panel_space = 0.05, target_space = 0.2, tree_space_bottom = 0.1, heat_rel_height = 0.1,
-#           edge_vars = list(size = 1, color = 'grey'))
-# tree_plot
 
-
-#Combine
+#Combine & export
 library(patchwork)
-# (tree_plot + conf_matrix_plot + spatial_hist )+
-#   plot_layout(ncol = 1) 
-# 
-# spatial_hist / (tree_plot + conf_matrix_plot + plot_layout(widths = c(1,0.5))) + 
-#   plot_layout(heights = c(0.5,1.5))
 
-##Arrangement 1
+## Arrangement 1
 png(filename = 'figs/spatial_plots.png',
 width = 6, height = 7, units = 'in', res = 600)
 C<-(spatial_hist+conf_matrix_plot)
@@ -535,20 +485,20 @@ C<-(spatial_hist+conf_matrix_plot)
 #For top right alginment: inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) 
 dev.off()
 
-##Arrangement 2
-B <- spatial_hist / conf_matrix_plot +   plot_layout(heights = c(2,1))
-tree_plot + B  +   plot_layout(widths = c(2,1)) +  plot_annotation(tag_levels = 'A')
+## Arrangement 2
+# B <- spatial_hist / conf_matrix_plot +   plot_layout(heights = c(2,1))
+# tree_plot + B  +   plot_layout(widths = c(2,1)) +  plot_annotation(tag_levels = 'A')
 
-##Arrangement 3
-(spatial_hist / tree_plot + inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) +
-   plot_layout(heights = c(0.5,1.5))+
-   plot_annotation(tag_levels = list(c('A', 'B'), '1'))
+## Arrangement 3
+# (spatial_hist / tree_plot + inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) +
+#    plot_layout(heights = c(0.5,1.5))+
+#    plot_annotation(tag_levels = list(c('A', 'B'), '1'))
 
 
 ```
 
 
-Plot some of these relationship for funsies
+Plot some of these relationship to help with writing the discussion
 ```{r}
 # head(blue_green_2018)
 
@@ -563,10 +513,12 @@ blue_green_2018 %>%
   ggplot( aes(x=elev, fill=group)) +
     geom_histogram( color="#e9ecef", alpha=0.9, position = 'identity') +
     scale_fill_manual(values=c('#1f78b4','#33a02c'))
+
 blue_green_2018 %>%
   ggplot( aes(y=elev, x=group, fill=group)) +
     geom_boxplot(alpha=0.9) +
     scale_fill_manual(values=c('#1f78b4','#33a02c'))
+
 #Generally higher elevation lakes are blue, no surprise there. 
 wilcox.test(elev~group, data=blue_green_2018)
 
