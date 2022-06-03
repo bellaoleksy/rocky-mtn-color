@@ -1625,7 +1625,7 @@ library(themis)
 
 
 set.seed(123)
-split_d <- initial_split(trends_df, strata = Trend_new, prop=0.66)
+split_d <- initial_split(trends_df, strata = Trend_new, prop=0.60)
 train_d <- training(split_d)%>%  mutate_if(is.numeric, round, digits=2) 
 test_d<- testing(split_d)%>%  mutate_if(is.numeric, round, digits=2) 
 ## I doubled checked and at least 25% of each Trend group is set aside for validation
