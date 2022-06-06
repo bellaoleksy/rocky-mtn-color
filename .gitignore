@@ -58,3 +58,4 @@ vignettes/*.pdf
 
 #Keep figs folder but ignore the interactive_map_files sub-folder
 /figs/interactive_map_files
+/interactive_map_files
