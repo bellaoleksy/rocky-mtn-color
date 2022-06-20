@@ -1,7 +1,7 @@
 ---
 title: "LimnoSat-US_Tutorial"
-author: "Simon Topp"
-date: "11/2/2020"
+author: "Ross, Oleksy"
+date: "2022-06-20"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -452,7 +452,7 @@ trend_plotter <- function(study_lakes = high_lakes,
     mutate(
       Trend = case_when(
         p.value <= 0.05 & slope >= 0 & early_mean < 530 ~ 'Blue -> Greener',
-        p.value <= 0.05 & slope >= 0 & early_mean >= 530 ~ 'Intensifying Green/Yellow',
+        p.value <= 0.05 & slope >= 0 & early_mean >= 530 ~ 'Intensifying Green/brown',
         p.value <= 0.05 & slope <= 0 & early_mean > 530 ~ 'Green -> Bluer',
         p.value <= 0.05 & slope <= 0 & early_mean < 530 ~ 'Intensifying Blue',
         p.value > 0.05 ~ 'No trend'
@@ -463,14 +463,14 @@ trend_plotter <- function(study_lakes = high_lakes,
           'No trend',
           'Intensifying Blue',
           'Green -> Bluer',
-          'Intensifying Green/Yellow',
+          'Intensifying Green/brown',
           'Blue -> Greener'
         )
       )
     ) %>%
     mutate(
-      Mode_change = case_when(Trend == "Blue -> Greener" & group == "Green/murky" ~ "Change to Green/murky",
-                              Trend == "Green -> Bluer" & group == "Blue/clear" ~ "Change to Blue/clear",
+      Mode_change = case_when(Trend == "Blue -> Greener" & group == "Green/brown" ~ "Change to Green/brown",
+                              Trend == "Green -> Bluer" & group == "Blue" ~ "Change to Blue",
                               TRUE ~ "No net change")
     )
 
@@ -542,7 +542,7 @@ trendColors <- c(
   'No trend' = 'grey90',
   'Intensifying Blue' = '#1f78b4',
   'Green -> Bluer' = '#a6cee3',
-  'Intensifying Green/Yellow' = '#33a02c',
+  'Intensifying Green/brown' = '#33a02c',
   'Blue -> Greener' = '#b2df8a'
 )
 
@@ -554,7 +554,7 @@ trendColors_new <- c(
 
 
 #Export
-png(filename = 'figs/Trend Examples.png',
+png(filename = 'figs/Figure3.Trend Examples.png',
     width = 5,
     height = 8,
     res = 600,
@@ -568,7 +568,7 @@ ggplot(dwl_all, aes(x = year, y = value, group = Hylak_id)) +
   scale_fill_manual(values=trendColors)+
   scale_color_manual(values=trendColors)+
   geom_text(x = 1990, y = 585,
-            aes(group=Trend, label = paste("n =",n)),
+            aes(group=Trend, label = paste("n =",n,";",perc,"%")),
             color="black",
             data = trend_labels, size=3)+ #Add label for sample size
   scale_x_continuous(breaks=seq(1986, 2018, 6))+
@@ -1027,7 +1027,7 @@ summer_slope_df<-dwl_all %>%
   inner_join(prism_trend_categories) %>%  #prism trend categories
    mutate(Trend_new = case_when(
         Trend %in% c("Intensifying Blue","Green -> Bluer", "Green -> Slightly Bluer") ~ 'Negative',
-        Trend %in% c("Intensifying Green/Yellow","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
+        Trend %in% c("Intensifying Green/brown","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
         Trend == "No trend" ~ 'No trend')) %>%
   mutate(Trend_new=as.factor(as.character(Trend_new)))%>%
   select(-Trend) %>%
@@ -1088,6 +1088,20 @@ hist(n_dist$median_n)
 hist(n_dist$min_n)
 
 
+## Ed Hall- Is watershed slope  just a proxy for watershed size? seems like that came out in the analysis of green lakes but not here. thoughts?
+
+blue_green_2018 %>%
+  filter(ws_area < 1000) %>%
+  ggplot(aes(x=log10(slope), y=log10(ws_area), fill=group))+
+  geom_point(shape=21)+
+  geom_smooth(method="lm", se=FALSE)
+
+blue_green_2018 %>%
+  filter(ws_area < 1000) %>%
+  ggplot(aes(x=(slope), y=(ws_area), fill=group))+
+  geom_point(shape=21)+
+  geom_smooth(method="lm", se=FALSE)
+
 ```
 
 ### Table S1. Modal shifts & lake type
@@ -1097,7 +1111,7 @@ tab1<-dwl %>%
   filter(stat == 'median') %>%
   dplyr::select(Hylak_id,Trend, data,intercept,slope, Mode_change) %>%
   unnest(c(data,intercept)) %>%
-  filter(Trend=="Blue -> Greener" & Mode_change == "Change to Green/murky") %>%
+  filter(Trend=="Blue -> Greener" & Mode_change == "Change to Green/brown") %>%
   distinct(Hylak_id,.keep_all = T) %>%
   inner_join(lake_descriptor %>% select(lagoslakeid, Hylak_id, lake_namegnis), by="Hylak_id") %>%
   inner_join(lakezones %>% select(lagoslakeid, lake_centroidstate), by="lagoslakeid") %>%
@@ -1111,7 +1125,7 @@ tab2<-dwl %>%
   filter(stat == 'median') %>%
   dplyr::select(Hylak_id,Trend, data,intercept,slope, Mode_change) %>%
   unnest(c(data,intercept)) %>%
-  filter(Trend=="Green -> Bluer" & Mode_change == "Change to Blue/clear") %>%
+  filter(Trend=="Green -> Bluer" & Mode_change == "Change to Blue") %>%
   distinct(Hylak_id,.keep_all = T) %>%
   inner_join(lake_descriptor %>% select(lagoslakeid, Hylak_id, lake_namegnis), by="Hylak_id") %>%
   inner_join(lakezones %>% select(lagoslakeid, lake_centroidstate), by="lagoslakeid") %>%
@@ -1132,8 +1146,8 @@ trend_table<-bind_rows(tab1, tab2)%>%
              NL="Natural lake",
              RSVR="Reservoir or impoundment"),
          Mode_change=recode(Mode_change,
-                            'Change to Green/murky'="Blue/clear to Green/murky",
-                            'Change to Blue/clear'="Green/murky to Blue/clear"),
+                            'Change to Green/brown'="Blue to Green/brown",
+                            'Change to Blue'="Green/brown to Blue"),
          Hylak_id=as.character(as.numeric(Hylak_id))) %>%
   mutate(`Lat (dd)`= unlist(map(geometry,1)),
          `Long (dd))` = unlist(map(geometry,2))) %>%
@@ -1145,6 +1159,7 @@ trend_table<-bind_rows(tab1, tab2)%>%
          'Lake type'=res)
 
 ###EXPORT TABLE
+library(huxtable)
 trend_table_export <-
 trend_table %>%
   hux(add_colnames=TRUE) %>%
@@ -1193,7 +1208,7 @@ temperature_table<-dwl %>%
   mutate(
       Slope_direction = case_when(
         Trend %in% c("Intensifying Blue","Green -> Bluer", "Green -> Slightly Bluer") ~ 'Negative',
-        Trend %in% c("Intensifying Green/Yellow","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
+        Trend %in% c("Intensifying Green/brown","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
         Trend == "No trend" ~ 'No trend')) %>%
   relocate(Slope_direction, .before = Trend) %>%
   mutate(winter_warmer=" - ",
@@ -1206,8 +1221,8 @@ temperature_table<-dwl %>%
   mutate(across(where(is.character), ~replace_dash(.))) %>% #Replace NA with "-" 
   mutate(Mode_change = recode(
       Mode_change,
-      "Change to Blue/clear" = "Green/murky to Blue/clear",
-      "Change to Green/murky" = "Blue/clear to Green/murky")) %>%
+      "Change to Blue" = "Green/brown to Blue",
+      "Change to Green/brown" = "Blue to Green/brown")) %>%
   rename("Winter - warming"=winter_warmer,
          "Winter - cooling"=winter_cooler,
          "Spring - warming"=spring_warmer,
@@ -1244,7 +1259,7 @@ precipitation_table<-dwl %>%
   mutate(
       Slope_direction = case_when(
         Trend %in% c("Intensifying Blue","Green -> Bluer", "Green -> Slightly Bluer") ~ 'Negative',
-        Trend %in% c("Intensifying Green/Yellow","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
+        Trend %in% c("Intensifying Green/brown","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
         Trend == "No trend" ~ 'No trend')) %>%
   relocate(Slope_direction, .before = Trend) %>%
   mutate(summer_wetter=" - ",
@@ -1253,8 +1268,8 @@ precipitation_table<-dwl %>%
   mutate(across(where(is.character), ~replace_dash(.))) %>% #Replace NA with "-" 
   mutate(Mode_change = recode(
       Mode_change,
-      "Change to Blue/clear" = "Green/murky to Blue/clear",
-      "Change to Green/murky" = "Blue/clear to Green/murky")) %>%
+      "Change to Blue" = "Green/brown to Blue",
+      "Change to Green/brown" = "Blue to Green/brown")) %>%
   rename("Winter - wetter"=winter_wetter,
          "Winter - drier"=winter_drier,
          "Spring - wetter"=spring_wetter,
@@ -1282,7 +1297,7 @@ temperature_table_export<-
   map_background_color(temperature_table_export, by_values(  'No trend' = 'grey90',
   'Intensifying Blue' = '#1f78b4',
   'Green -> Bluer' = '#a6cee3',
-  'Intensifying Green/Yellow' = '#33a02c',
+  'Intensifying Green/brown' = '#33a02c',
   'Blue -> Greener' = '#b2df8a')) 
 temperature_table_export<-map_background_color(temperature_table_export, by_values(  'No trend' = 'grey90',
   'Negative' = '#a6cee3',
@@ -1303,7 +1318,7 @@ precipitation_table_export<-
   map_background_color(precipitation_table_export, by_values(  'No trend' = 'grey90',
   'Intensifying Blue' = '#1f78b4',
   'Green -> Bluer' = '#a6cee3',
-  'Intensifying Green/Yellow' = '#33a02c',
+  'Intensifying Green/brown' = '#33a02c',
   'Blue -> Greener' = '#b2df8a')) 
 precipitation_table_export<-map_background_color(precipitation_table_export, by_values(  'No trend' = 'grey90',
   'Negative' = '#a6cee3',
@@ -1500,7 +1515,7 @@ dwl_map <- dwl %>%
   inner_join(site_cols,.) %>%
   arrange(Trend)
 
-png(filename = 'figs/trend_map.png',
+png(filename = 'figs/Figure4A.trend_map.png',
     width = 4, height = 6, units = 'in', res = 300)
 
 tm_shape(hil) +
@@ -1532,7 +1547,7 @@ dev.off()
 ### Figure 4B. DWL trend ridges
 ```{r}
 library(ggridges)
-png(filename = 'figs/trend_ridges.png',
+png(filename = 'figs/Figure4B.trend_ridges.png',
     width = 2, height = 5.75, units = 'in', res = 300)
 dwl_ridges <- dwl_all %>%
     filter(Trend!="No trend") %>%
@@ -1565,19 +1580,24 @@ ggplot(dwl_ridges, aes(x = value, y = year, group = year)) +
     alpha = 0.4
   ) +
   geom_density_ridges(
-    data = filter(dwl_ridges, Trend == "Intensifying Green/Yellow"),
+    data = filter(dwl_ridges, Trend == "Intensifying Green/brown"),
     scale = 7,
     size = 0.25,
     rel_min_height = 0.01,
     fill = "#33a02c",
     alpha = 0.4
   ) +
+    geom_text(x = 480, y = 2024,
+            aes(group=Trend, label = paste(perc,"%")),
+            color="black",
+            data = trend_labels %>%
+              filter(!Trend == "No trend"), size=2.3) +#Add label for sample size
   theme_few(base_size = 9.5)+
   xlim(range(dwl_ridges$value)) + 
   facet_wrap( ~ Trend,nrow=4,scales="free_x")+
   theme(plot.margin = unit(c(0,0.1,0,0), "cm"))+
   scale_x_continuous(limits = c(470, 590), expand = c(0.01, 0)) +
-  scale_y_reverse(breaks = c(seq(2020, 1984, -6))) +
+  # scale_y_reverse(breaks = c(seq(2020, 1984, -6))) +
   labs(x="Dominant wavelength (nm)",
        y="Year")
 dev.off()
@@ -1594,7 +1614,6 @@ dev.off()
 trends_df<-dwl_all %>%
   ungroup()%>%
   inner_join(lake_descriptor %>% select(lagoslakeid, Hylak_id), by="Hylak_id") %>%
-  # inner_join(lakezones %>% select(lagoslakeid, lake_centroidstate, lake_elevation_m, lake_waterarea_ha), by="lagoslakeid") %>%
   select(Hylak_id, Trend) %>%
   distinct(Hylak_id,.keep_all = T) %>%
   inner_join(blue_green_2018) %>% #add LakeCat variables
@@ -1604,7 +1623,7 @@ trends_df<-dwl_all %>%
   select(!contains(c("cv_","fall"))) %>% #excluding fall variables because they are hard to interpret and shouldn't directly effect summer color
    mutate(Trend_new = case_when(
         Trend %in% c("Intensifying Blue","Green -> Bluer", "Green -> Slightly Bluer") ~ 'Negative',
-        Trend %in% c("Intensifying Green/Yellow","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
+        Trend %in% c("Intensifying Green/brown","Blue -> Greener", "Blue -> Slightly Greener") ~ "Positive",
         Trend == "No trend" ~ 'No trend')) %>%
   mutate(Trend_new=as.factor(as.character(Trend_new)))%>%
   select(-Trend) %>%
@@ -1764,22 +1783,22 @@ confMatRF<-confusionMatrix(fit_rf$'.pred_class', test_d$Trend_new)
 confMatRF
 
 #Plot CM
-plt<-as.data.frame(confMatRF$table)
-accuracy <- confMatRF$overall
-plt$Prediction <- factor(plt$Prediction)
-
-ggplot(plt, aes(Reference,Prediction, fill= Freq)) +
-    scale_x_discrete(expand = c(0, 0))+ #remove white space
-  scale_y_discrete(expand = c(0, 0))+ #remove white space
-    geom_tile(color="black") + geom_text(aes(label=Freq)) +
-    scale_fill_gradient(low="white", high="#009194") +
-    labs(y = "Reference",x = "Prediction")+
-    labs(title = paste0("Accuracy: ",round(accuracy,2))) +
-    theme(axis.title = element_blank(),
-          axis.text.y=element_text(angle=45))
+# plt<-as.data.frame(confMatRF$table)
+# accuracy <- confMatRF$overall
+# plt$Prediction <- factor(plt$Prediction)
+# 
+# ggplot(plt, aes(Reference,Prediction, fill= Freq)) +
+#     scale_x_discrete(expand = c(0, 0))+ #remove white space
+#   scale_y_discrete(expand = c(0, 0))+ #remove white space
+#     geom_tile(color="black") + geom_text(aes(label=Freq)) +
+#     scale_fill_gradient(low="white", high="#009194") +
+#     labs(y = "Reference",x = "Prediction")+
+#     labs(title = paste0("Accuracy: ",round(accuracy,2))) +
+#     theme(axis.title = element_blank(),
+#           axis.text.y=element_text(angle=45))
 
 #Alt. way--
-conf_mat_RF <- confusion_matrix(targets = test_d$Trend_new,
+conf_mat_RF <- cvms::confusion_matrix(targets = test_d$Trend_new,
                              predictions = fit_rf$'.pred_class')
 tableRF<-data.frame(conf_mat_RF$`Confusion Matrix`)
 
@@ -1824,7 +1843,7 @@ dev.off()
 ```{r}
 
 png(
-  filename = 'figs/RF_results.png',
+  filename = 'figs/Figure5.RF_results.png',
   width = 4,
   height = 12,
   res = 600,
@@ -1916,7 +1935,7 @@ D <- ggplot(trends_df, aes(x = Trend_new, y = slope_winter_ppt_mm, fill = Trend_
     axis.title.x = element_blank(),
     # axis.ticks.x = element_blank()
   ) +
-  labs(y="Slope of winter precipitation\n1984-2020 (mm/year)")+
+  labs(y="Change in winter precip.\n1984-2020 (mm/year)")+
   labs(title=paste0("VI = ", round(VI_winterppt, 2)))
 
 
@@ -1993,7 +2012,7 @@ dev.off()
 ```{r}
 
 png(
-  filename = 'figs/RF_results_top10.png',
+  filename = 'figs/FigureS3.RF_results_top10.png',
   width = 8,
   height = 13,
   res = 600,
@@ -2098,7 +2117,7 @@ D <- ggplot(trends_df%>%
     axis.title.x = element_blank(),
     # axis.ticks.x = element_blank()
   ) +
-  labs(y="Slope of winter precipitation\n1984-2020 (mm/year)")+
+  labs(y="Change in winter precipitation\n1984-2020 (mm/year)")+
   labs(title=paste0("VI = ", round(VI_winterppt, 2)))
 
 
