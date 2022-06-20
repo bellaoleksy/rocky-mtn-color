@@ -109,8 +109,8 @@ blue_green_2018 <- glcp_high_lakes %>%
   summarize(across(where(is.numeric),median, na.rm = T)) %>%
   mutate(group = cut(dWL, 
                      breaks = c(0,530,Inf), 
-                     labels = c('Blue/clear',
-                                          'Green/murky'))) %>%
+                     labels = c('Blue',
+                                          'Green/brown'))) %>%
   dplyr::filter(!is.na(dWL)) %>%
   inner_join(lake_descriptor) %>%
   mutate(air_temp = mean_annual_temp_k - 273.15,
@@ -157,7 +157,7 @@ blue_green_2018 <- glcp_high_lakes %>%
   na.omit(.) #Everything has to be complete data. 
 
   
-
+length(unique(blue_green_2018$Hylak_id))
 
 
 ```
@@ -210,7 +210,7 @@ bg.fui = tibble(
 )
 
 ##Legend only
-png(filename = 'figs/F-U_legend.png',
+png(filename = 'figs/Figure1A.F-U_legend.png',
     width = 2, height = 11.8, units = 'in', res = 600)
 
 ggplot() +
@@ -252,7 +252,7 @@ ggplot() +
 
 dev.off()
 
-png(filename = 'figs/spatial_color_map_continuous.png',
+png(filename = 'figs/Figure1.spatial_color_map_continuous.png',
     width = 4, height = 6, units = 'in', res = 300)
 
 tm_shape(hil) +
@@ -291,7 +291,7 @@ dev.off()
 
 
 
-png(filename = 'figs/bg_map_categorical.png',
+png(filename = 'figs/FigureS1.bg_map_categorical.png',
     width = 5, height = 8, units = 'in', res = 300)
 
 tm_shape(hil) +
@@ -328,8 +328,8 @@ dev.off()
 ```{r}
 #cart plot examples here:
 #http://www.milbo.org/rpart-plot/prp.pdf
-png(filename = 'figs/dwl_hist_2009-2020.png', width = 4, height = 4,
-    units = 'in', res = 300)
+# png(filename = 'figs/dwl_hist_2009-2020.png', width = 4, height = 4,
+#     units = 'in', res = 300)
 spatial_hist<-ggplot() + 
   geom_rect(data = bg.fui, 
             aes(xmin = ymin, xmax = ymax, ymin = -5, ymax = 100, fill = color)) + 
@@ -344,7 +344,7 @@ spatial_hist<-ggplot() +
   labs(x="Dominant wavelength (nm)",
        y="Density")
 spatial_hist
-dev.off()
+# dev.off()
 
 blue_green_2018 %>%
   group_by(group) %>%
@@ -396,58 +396,13 @@ test_d$guess <- predict(cart_mod, test_d, 'class')
 cm <- conf_mat(test_d, group,guess)
 accuracy(test_d,group,guess)
 
-# png(filename = 'figs/bg_tree.png',
-# width = 7, height = 8, units = 'in', res = 300)
-rpart.plot(cart_mod,
-           # type = 4, #2=split labels below node labels; but I like the look of 4 with labels on both connecting lines and no "yesno"
-           extra = 2,#2 = class rate; 106 = prob. of 2nd class + percent of observations
-           under = TRUE, #I kind of like the look of this better
-           clip.right.labs = FALSE,
-           branch = 0.3,
-           branch.type = 5, yesno=FALSE, #If you comment out type=4, I kind of like the look of this
-           branch.col = "gray",
-           # main="Factors that influence lake category",
-           box.palette = list('#1f78b4','#33a02c'))
-# dev.off()
 
-
-## Create manually because the plot_confusion_matrix function is pissing me off
-conf_mat <- confusion_matrix(targets = test_d$group,
-                             predictions = test_d$guess)
-table<-data.frame(conf_mat$`Confusion Matrix`)
-
-plotTable <- table %>%
-  group_by(Target) %>%
-  mutate(prop = N/sum(N),
-         prop = round(prop,2))
-
-# fill alpha relative to sensitivity/specificity by proportional outcomes within reference groups (see dplyr code above as well as original confusion matrix for comparison)
-# png(filename = 'figs/bg_confusion_matrix_gg.png',
-#     width = 6, height = 5,
-#     units = 'in', res = 300)
-conf_matrix_plot<-ggplot(data = plotTable,
-       mapping = aes(x = Target, y = Prediction, fill = Pos_Blue.clear)) +
-  geom_tile(aes(fill=Pos_Blue.clear), color="black") +
-  scale_x_discrete(expand = c(0, 0))+ #remove white space
-  scale_y_discrete(expand = c(0, 0))+ #remove white space
-  geom_text(aes(label = paste0("n=",N)), vjust = .5,  alpha = 1, size=4) +
-  geom_text(aes(label = paste0("prop.=",prop)), vjust = 2.0,  alpha = 1, size=3) +
-  scale_fill_manual(values = c(TP = "#1f78b4", TN = "#33a02c",
-                               FN = "white" , FP ="white")) +
-  theme_few() +
-  # xlim(rev(levels(table$Target)))+
-  theme(legend.position="none")
-conf_matrix_plot
-# dev.off()
-
-
-##GGPARTY? Another way
+## Plot regression tree reults using ggparty
 library(ggparty)
 cart_mod_party<-as.party(cart_mod)
-# plot(cart_mod_party)
+
 tree_plot<-ggparty(cart_mod_party) +
   geom_edge(size=1, color="grey50") +
-    # geom_node_label(aes(label = splitvar), ids = "inner") +
   geom_edge_label() +
   geom_node_splitvar() +
   geom_node_plot(gglist = list(geom_bar(aes(x = "", fill = group),
@@ -459,46 +414,56 @@ tree_plot<-ggparty(cart_mod_party) +
                                 axis.text.x=element_blank(),
                                 axis.ticks.x=element_blank(),
                                 legend.position="none")),
-                               (scale_x_discrete(expand = c(0, 0))), #remove white space
-                               # (scale_y_discrete(expand = c(0, 0))), #remove white space)
+                               (scale_x_discrete(expand = c(0, 0))), #removes white space
                                ylab("Proportion")),
                                shared_axis_labels = TRUE) +
   geom_node_label(aes(label = paste0("n=", nodesize)),
-                  # fontface = "bold",
                   ids = "terminal",
                   size = 4, 
-                  # nudge_y = 0.01,
                   nudge_x = 0.01)+
   theme(plot.margin = unit(c(0,0,0,0), "cm")) 
-  # geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 3.2) 
 tree_plot
+
+
+
+## Create manually because the plot_confusion_matrix function doesn't have the customizations I want
+conf_mat <- confusion_matrix(targets = test_d$group,
+                             predictions = test_d$guess)
+table<-data.frame(conf_mat$`Confusion Matrix`)
+
+plotTable <- table %>%
+  group_by(Target) %>%
+  mutate(prop = N/sum(N),
+         prop = round(prop,2))
+
+conf_matrix_plot<-ggplot(data = plotTable,
+       mapping = aes(x = Target, y = Prediction, fill = Pos_Blue)) +
+  geom_tile(aes(fill=Pos_Blue), color="black") +
+  scale_x_discrete(expand = c(0, 0))+ #remove white space
+  scale_y_discrete(expand = c(0, 0))+ #remove white space
+  geom_text(aes(label = paste0("n=",N)), vjust = .5,  alpha = 1, size=4) +
+  geom_text(aes(label = paste0("prop.=",prop)), vjust = 2.0,  alpha = 1, size=3) +
+  scale_fill_manual(values = c(TP = "#1f78b4", TN = "#33a02c",
+                               FN = "white" , FP ="white")) +
+  theme_few() +
+  theme(legend.position="none")
+conf_matrix_plot
 
 
 #Combine & export
 library(patchwork)
-
-## Arrangement 1
-png(filename = 'figs/spatial_plots.png',
+png(filename = 'figs/Figure2.spatial_plots.png',
 width = 6, height = 7, units = 'in', res = 600)
 C<-(spatial_hist+conf_matrix_plot)
 (C/tree_plot)+ plot_layout(heights = c(0.3,1))+  plot_annotation(tag_levels = 'A')
 #For top right alginment: inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) 
 dev.off()
 
-## Arrangement 2
-# B <- spatial_hist / conf_matrix_plot +   plot_layout(heights = c(2,1))
-# tree_plot + B  +   plot_layout(widths = c(2,1)) +  plot_annotation(tag_levels = 'A')
-
-## Arrangement 3
-# (spatial_hist / tree_plot + inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) +
-#    plot_layout(heights = c(0.5,1.5))+
-#    plot_annotation(tag_levels = list(c('A', 'B'), '1'))
-
-
 ```
 
 
-Plot some of these relationship to help with writing the discussion
+Plot some of these relationship to help with writing the discussion.
+Don't need to publish this section of the code, obviously. 
 ```{r}
 # head(blue_green_2018)
 
