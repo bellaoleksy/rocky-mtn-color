@@ -75,7 +75,7 @@ co_summary_median <- ls_co %>%
          doy = yday(date)) %>%
   filter(month %in% 7:9, 
          doy <= 258, #Sept 14/15
-         year >= 2009,
+         year >= 2010,
          elevation > 1400) %>% 
   group_by(Hylak_id) %>%
   add_count() %>%
@@ -103,7 +103,7 @@ dwl_medians <- co_summary_median %>%
 
 #From recent decade to match map
 blue_green_2018 <- glcp_high_lakes %>%
-  filter(year >= 2009) %>%
+  filter(year >= 2010) %>%
   inner_join(dwl_medians) %>%
   group_by(Hylak_id) %>%
   summarize(across(where(is.numeric),median, na.rm = T)) %>%
@@ -359,6 +359,8 @@ train_d <- blue_green_2018 %>%
   mutate_if(is.numeric, round, digits=0) %>%
   rename("MAAT °C"=air_temp,
          "mean depth"=meandepth,
+         "max. depth"=maxdepth,
+         "watershed slope"=slope,
          WSA=ws_area)
 #how many lakes in the training dataset?
 # length(unique(train_d$Hylak_id))
@@ -370,6 +372,8 @@ test_d <- blue_green_2018 %>%
   mutate_if(is.numeric, round, digits=0)%>%
   rename("MAAT °C"=air_temp,
          "mean depth"=meandepth,
+         "max. depth"=maxdepth,
+         "watershed slope"=slope,
          WSA=ws_area)
 
 train_d <- train_d %>%
@@ -378,18 +382,19 @@ train_d <- train_d %>%
 
 
 ## Not run, but code that helped make decision about complexity parameter
+## Also note that lines 384-388 won't run with the modified header names on train_d, just FYI. 
 # prune_mod <-caret::train(
 #   group ~., data = train_d, method = "rpart",
 #   trControl = trainControl("boot", number = 100),
 #   tuneLength = 100
 #   )
-
+# prune_mod
 
 
 cart_mod <- rpart(group ~ ., data = train_d,
                   method = 'class',
-                  cp = 0.03) # CP is a tuning knob for tree complexity.
-
+                  # cp = 0.03) # CP is a tuning knob for tree complexity.
+                  cp = 0.023) # CP is a tuning knob for tree complexity.
 
 
 test_d$guess <- predict(cart_mod, test_d, 'class')
@@ -427,7 +432,7 @@ tree_plot
 
 
 ## Create manually because the plot_confusion_matrix function doesn't have the customizations I want
-conf_mat <- confusion_matrix(targets = test_d$group,
+conf_mat <- cvms::confusion_matrix(targets = test_d$group,
                              predictions = test_d$guess)
 table<-data.frame(conf_mat$`Confusion Matrix`)
 
