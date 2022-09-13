@@ -11,31 +11,36 @@ editor_options:
 
 
 ```{r setup, include=FALSE}
-library(tidyverse)
-library(here)
-library(leaflet)
-library(sf)
-library(feather)
-library(lubridate)
-library(mapview)
-library(USAboundaries)
-library(s2)
-library(elevatr)
-library(trend)
-library(tsibble)
-library(imputeTS)
-library(ggthemes)
-library(nhdplusTools)
-library(tmap)
-library(raster)
-library(caret)
-library(rpart)
-library(yardstick)
-library(rpart.plot)
-library(patchwork)
-library(cowplot)
-library(lfstat) #for water_year function
-library(zyp) #for zyp::zyp.sen, getting intercept for plotting sens slopes
+if(!require(tidyverse)){install.packages("tidyverse")};library(tidyverse) 
+if(!require(here)){install.packages("here")};library(here)
+if(!require(leaflet)){install.packages("leaflet")};library(leaflet)
+if(!require(sf)){install.packages("sf")};library(sf)
+if(!require(feather)){install.packages("feather")};library(feather)
+if(!require(lubridate)){install.packages("lubridate")};library(lubridate)
+if(!require(mapview)){install.packages("mapview")};library(mapview)
+if(!require(USAboundaries)){install.packages("USAboundaries")};library(USAboundaries)
+if(!require(s2)){install.packages("s2")};library(s2)
+if(!require(elevatr)){install.packages("elevatr")};library(elevatr)
+if(!require(trend)){install.packages("trend")};library(trend)
+if(!require(tsibble)){install.packages("tsibble")};library(tsibble)
+if(!require(imputeTS)){install.packages("imputeTS")};library(imputeTS)
+if(!require(ggthemes)){install.packages("ggthemes")};library(ggthemes)
+if(!require(nhdplusTools)){install.packages("nhdplusTools")};library(nhdplusTools)
+if(!require(tmap)){install.packages("tmap")};library(tmap)
+if(!require(raster)){install.packages("raster")};library(raster)
+if(!require(caret)){install.packages("caret")};library(caret)
+if(!require(rpart)){install.packages("rpart")};library(rpart)
+if(!require(yardstick)){install.packages("yardstick")};library(yardstick)
+if(!require(rpart.plot)){install.packages("rpart.plot")};library(rpart.plot)
+if(!require(patchwork)){install.packages("patchwork")};library(patchwork)
+if(!require(cowplot)){install.packages("cowplot")};library(cowplot)
+if(!require(lfstat)){install.packages("lfstat")};library(lfstat) #for water_year function
+if(!require(zyp)){install.packages("zyp")};library(zyp) #for zyp::zyp.sen, getting intercept for plotting sens slopes
+if(!require(beepr)){install.packages("beepr")};library(beepr) 
+if(!require(prism)){install.packages("prism")};library(prism) 
+
+
+
 # install.packages("remotes")
 # remotes::install_github("MilesMcBain/breakerofchains")
 library(breakerofchains)
@@ -69,14 +74,14 @@ co_summary <- ls_co %>%
   group_by(Hylak_id,year) %>%
   add_count() %>%
   filter(year >= 1984) %>% 
-  filter(n >= 3) %>% # at least 3 observations per year
+  # filter(n >= 3) %>% # at least 3 observations per year
   group_by(Hylak_id) %>%
   mutate(unique_years = n_distinct(year)) %>%
   filter(unique_years > 30) %>% # at least 30 years of data
   arrange(year) %>%
   #complete years
   group_by(Hylak_id,year) %>%
-  summarize(across(c(Blue:dWL),
+  dplyr::summarize(across(c(Blue:dWL),
                    .fns = list(mean = mean,
                                sd = sd,
                                max = max,
@@ -109,6 +114,45 @@ length(unique(co_full$Hylak_id))
 
 save(co_full, file = 'data/color_summary.RData')
 ```
+
+#### ~ For review
+What does the distribution of number of samples per summer look like?
+```{r, eval=F}
+
+distrib_samples <- ls_co %>%
+  dplyr::select(-year, -sat) %>%
+  mutate(month = month(date),
+         year = year(date),
+         doy = yday(date)) %>%
+  filter(month %in% 7:9, 
+         doy <= 258) %>% #Sept 14/15
+  group_by(Hylak_id,year) %>%
+  add_count() %>%
+  filter(year >= 1984) %>% 
+  filter(n >= 3) %>% # at least 3 observations per year
+  group_by(Hylak_id) %>%
+  mutate(unique_years = n_distinct(year)) %>%
+  filter(unique_years > 30) %>% # at least 30 years of data
+  arrange(year) %>%
+  #complete years
+  group_by(Hylak_id,year) %>%
+  count()
+
+
+#What does the distribution of number of samples look like overall?
+distrib_samples %>%
+  ggplot()+
+  geom_histogram(aes(x=n))
+
+#By year?
+distrib_samples %>%
+  ggplot()+
+  geom_histogram(aes(x=n))+
+  facet_wrap(~year)
+
+```
+
+
 
 
 ### PRISM
@@ -508,6 +552,8 @@ dwl_all <- dwl %>%
   unnest(intercept)
 
 
+length(unique(dwl_all$Hylak_id))
+
 ```
 
 
@@ -546,15 +592,21 @@ trendColors <- c(
   'Blue -> Greener' = '#b2df8a'
 )
 
-trendColors_new <- c(
+trendColors_a <- c(
   'No trend' = 'grey90',
   'Negative' = '#a6cee3',
   'Positive' = '#b2df8a'
 )
 
+trendColors_b <- c(
+  'No trend' = 'grey90',
+  'Blueing' = '#a6cee3',
+  'Greening' = '#b2df8a'
+)
+
 
 #Export
-png(filename = 'figs/Figure3.Trend Examples.png',
+png(filename = 'figs/Figure3.Trend Examples_updated.png',
     width = 5,
     height = 8,
     res = 600,
@@ -893,6 +945,17 @@ dwl %>%
   geom_smooth(method="lm")
 
 
+#Eden reservoir
+dwl %>%
+  filter(!stat %in% c("sd","mean")) %>%
+  unnest(c(data)) %>%
+  filter(Hylak_id=="111401") %>%
+  ggplot(aes(x=year,y=value, color=stat)) +
+  geom_point() +
+  geom_hline(yintercept=530)+
+  geom_smooth(method="lm")
+
+
 #Deweesee-Dye Res
 dwl %>%
   filter(!stat=="sd") %>%
@@ -1122,6 +1185,25 @@ blue_green_2018 %>%
   select(group,meandepth,maxdepth) %>%
   filter(group=="Green/brown") %>%
   Hmisc::describe()
+
+
+#Look at all the Wyoming lakes
+WYO_lakes<-  dwl %>%
+  filter(!stat=="sd") %>%
+  unnest(c(data)) %>%
+  ungroup() %>%
+  full_join(lake_descriptor %>% select(lagoslakeid, Hylak_id), by="Hylak_id") %>%
+  full_join(lakezones %>% select(lagoslakeid, lake_centroidstate), by="lagoslakeid") %>%
+  filter(lake_centroidstate=="WY")
+
+WYO_lakes %>%
+  # filter(!stat %in% c("sd","mean")) %>%
+  # filter(!Mode_change=="No net change") %>%
+  ggplot(aes(x=year,y=value, color=stat)) +
+  geom_point() +
+  geom_hline(yintercept=530)+
+  geom_smooth(method="lm") +
+  facet_wrap(gnis_name~., scales="free_y")
 ```
 
 ### Table S1. Modal shifts & lake type
@@ -1793,9 +1875,9 @@ ROC<-plot_roc_df %>%
   ggplot(., aes(x=1-Specificity,y=Sensitivity,color = Group)) +
   geom_step() +
   geom_text(data=aucs[aucs$Group=='NoTrend',], aes(x=0.2,y=1, label=paste0('AUC = ',round(AUC,2))), show.legend = FALSE, size=3) +
-    geom_text(data=aucs[aucs$Group=='Negative',], aes(x=0.2,y=.95, label=paste0('AUC = ',round(AUC,2))), show.legend = FALSE, size=3) +
+  geom_text(data=aucs[aucs$Group=='Negative',], aes(x=0.2,y=.95, label=paste0('AUC = ',round(AUC,2))), show.legend = FALSE, size=3) +
   geom_text(data=aucs[aucs$Group=='Positive',], aes(x=0.2,y=.9, label=paste0('AUC = ',round(AUC,2))), show.legend = FALSE, size=3) +
-  scale_color_manual(values = trendColors_new) +
+  scale_color_manual(values = trendColors_a) +
   geom_abline(slope=1,intercept=0, linetype="dashed")+
   theme_few()
 ROC
@@ -1855,7 +1937,7 @@ ggplot(data = plotTableRF,
   theme_few() +
   theme(axis.title = element_blank(),
         axis.text.y=element_text(angle=45))+
-  labs(title = paste0("Accuracy: ",round(accuracy,2))) +
+  # labs(title = paste0("Accuracy: ",round(accuracy,2))) +
   ROC
 
 dev.off()
@@ -1873,6 +1955,11 @@ png(
   units = 'in'
 )
 
+#Change labels from pos/neg to something a little more intuitive
+trends_df <- trends_df %>%
+  mutate(Trend_new=recode(Trend_new,
+             "Negative"="Blueing",
+             "Positive"="Greening"))
 
 #Extract VI scores for plot labels
 VI_pop_sum <-vip_plot$data %>%  pluck(2,1)
