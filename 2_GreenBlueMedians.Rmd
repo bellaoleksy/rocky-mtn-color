@@ -13,36 +13,38 @@ editor_options:
 
 
 ```{r setup, include=FALSE}
-library(tidyverse)
-library(leaflet)
-library(sf)
-library(feather)
-library(lubridate)
-library(mapview)
-library(USAboundaries)
-library(s2)
-library(elevatr)
-library(trend)
-library(tsibble)
-library(imputeTS)
-library(ggthemes)
-library(nhdplusTools)
-library(tmap)
-library(raster)
-library(caret)
-library(rpart)
-library(yardstick)
-library(rpart.plot)
-library(here)
-library(data.table)
-library(cvms)
-library(skimr)
-library(huxtable)
-library(patchwork)
+if(!require(tidyverse)){install.packages("tidyverse")};library(tidyverse)
+if(!require(leaflet)){install.packages("leaflet")};library(leaflet)
+if(!require(sf)){install.packages("sf")};library(sf)
+if(!require(feather)){install.packages("feather")};library(feather)
+if(!require(lubridate)){install.packages("lubridate")};library(lubridate)
+if(!require(mapview)){install.packages("mapview")};library(mapview)
+if(!require(USAboundaries)){install.packages("USAboundaries")};library(USAboundaries)
+if(!require(s2)){install.packages("s2")};library(s2)
+if(!require(elevatr)){install.packages("elevatr")};library(elevatr)
+if(!require(trend)){install.packages("trend")};library(trend)
+if(!require(tsibble)){install.packages("tsibble")};library(tsibble)
+if(!require(imputeTS)){install.packages("imputeTS")};library(imputeTS)
+if(!require(ggthemes)){install.packages("ggthemes")};library(ggthemes)
+if(!require(nhdplusTools)){install.packages("nhdplusTools")};library(nhdplusTools)
+if(!require(tmap)){install.packages("tmap")};library(tmap)
+if(!require(raster)){install.packages("raster")};library(raster)
+if(!require(caret)){install.packages("caret")};library(caret)
+if(!require(rpart)){install.packages("rpart")};library(rpart)
+if(!require(yardstick)){install.packages("yardstick")};library(yardstick)
+if(!require(rpart.plot)){install.packages("rpart.plot")};library(rpart.plot)
+if(!require(here)){install.packages("here")};library(here)
+if(!require(data.table)){install.packages("data.table")};library(data.table)
+if(!require(cvms)){install.packages("cvms")};library(cvms)
+if(!require(skimr)){install.packages("skimr")};library(skimr)
+if(!require(huxtable)){install.packages("huxtable")};library(huxtable)
+if(!require(patchwork)){install.packages("patchwork")};library(patchwork)
+if(!require(ggparty)){install.packages("ggparty")};library(ggparty)
+if(!require(Hmisc)){install.packages("Hmisc")};library(Hmisc)
 
 # Use dplyr select
 select<-dplyr::select
-
+summarize<-dplyr::summarize
 sf_use_s2(use_s2 = T)
 knitr::opts_chunk$set(echo = TRUE, warning = F, comment = F, message = F)
 
@@ -403,7 +405,7 @@ accuracy(test_d,group,guess)
 
 
 ## Plot regression tree reults using ggparty
-library(ggparty)
+
 cart_mod_party<-as.party(cart_mod)
 
 tree_plot<-ggparty(cart_mod_party) +
@@ -456,7 +458,6 @@ conf_matrix_plot
 
 
 #Combine & export
-library(patchwork)
 png(filename = 'figs/Figure2.spatial_plots.png',
 width = 6, height = 7, units = 'in', res = 600)
 C<-(spatial_hist+conf_matrix_plot)
@@ -464,6 +465,99 @@ C<-(spatial_hist+conf_matrix_plot)
 #For top right alginment: inset_element(conf_matrix_plot, left = 0.67, bottom = 0.67, right = 1, top = 1, align_to = 'full')) 
 dev.off()
 
+```
+
+## Figure SX. Correlations
+Reviewer comment: "Although many indicators are involved in lake color, most of them are self-correlated. For example, high-altitude lakes are deeper, have steep-slope, and lower MAAT. Due to its low level of urbanization, it has a small population and a low proportion of cultivated land; and because it is located upstream, its pollutant enrichment level is low. Although this study has confirmed the original color or trends in lakes are associated with the above indicators, all associations can be attributed to the altitude. Obviously, if the purpose of this study is to prove the difference between the color of lakes at high and low altitudes, or to prove the relationship between altitude and MAAT, lake slope, depth or human population, etc., it does not make much sense."
+
+Here I want to show the reviewer that the predictors are not nearly as collinear as you might expect. 
+
+```{r}
+## Get a correlation matrix
+corr_df<-blue_green_2018 %>% select(-Hylak_id, -group, -res, -lake_connectivity, -dWL) %>% drop_na()
+res <- rcorr(as.matrix(corr_df))
+res
+
+
+# ++++++++++++++++++++++++++++
+# flattenCorrMatrix
+# ++++++++++++++++++++++++++++
+#Function from: http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software
+# cormat : matrix of the correlation coefficients
+# pmat : matrix of the correlation p-values
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  = (cormat)[ut],
+    p = pmat[ut]
+  )
+}
+
+#Create dataframe of pearson r and p-values
+spatial_correlations<-flattenCorrMatrix(res$r, res$P)
+
+#How many are significant at the p < 0.01 level?
+spatial_correlations %>%
+  filter(p<0.01) %>% ## uhhh basically all of them
+  filter(row %in% c("air_temp","maxdepth","slope")) %>%
+  arrange(desc(cor)) #this looks like a managable amount to plot. 
+
+
+#Make bar plot
+png(filename = 'figs/FigureSX.spatial_predictor_correlations.png',
+width = 10, height = 7, units = 'in', res = 600)
+
+spatial_correlations %>%
+  filter(p<0.01) %>% ## uhhh basically all of them
+  filter(row %in% c("air_temp","maxdepth","slope")) %>%
+  mutate(row =
+          ifelse(row=="air_temp","MAAT (°C)",
+          ifelse(row=="maxdepth", "max. depth",
+          ifelse(row=="slope", "watershed slope"," ")))) %>%
+  mutate(column=
+       ifelse(column=="precip", "MM PPT (mm)", 
+       ifelse(column=="air_temp","MAAT (°C)",
+       ifelse(column=="LSA", "lake area",
+       ifelse(column=="elev", "elevation",
+       ifelse(column=="pop_sum", "human pop.",
+       ifelse(column=="maxdepth", "max. depth",
+       ifelse(column=="meandepth", "mean lake depth (m)",
+       ifelse(column=="ws_area", "watershed area",
+       ifelse(column=="no3_dep", "NO3 dep.",
+       ifelse(column=="nh3_dep", "NH3 dep.",
+       ifelse(column=="n_dep", "total N dep.",
+       ifelse(column=="perc_ice", "% ice/snow",
+       ifelse(column=="perc_urban", "% urban",
+       ifelse(column=="sil", "% siliceous bedrock",
+       # ifelse(column=="perc_decid", "% of catchment area classified as deciduous forest land cover",
+       # ifelse(column=="perc_conifer", "% of catchment area classified as evergreen forest land cover ",
+       # ifelse(column=="perc_mixedForest", "% of catchment area classified as mixed deciduous/evergreen forest land cover",
+       ifelse(column=="perc_shrub", "% shrub/scrub",
+       ifelse(column=="perc_grass", "% grassland/herbaceous",
+       ifelse(column=="perc_wetland", "% wetland",
+       ifelse(column=="perc_hay", "% hay",
+       ifelse(column=="perc_crop", "% crop",
+       ifelse(column=="perc_ag", "% ag.",
+       ifelse(column=="perc_forest", "% forset",
+       ifelse(column=="perc_barren", "% barren",
+       ifelse(column=="slope", "watershed slope",
+       ifelse(column=="WALA", "watershed area:lake area",
+       ifelse(column=="cti", "composite topographic index"," ")))))))))))))))))))))))))) %>%
+  arrange(desc(cor)) %>%
+  mutate(name=paste(row, "-", column)) %>%
+  ggplot(aes(x=cor,y=fct_reorder(name, cor, .desc = TRUE), fill=cor))+
+  geom_bar(stat="identity", width=0.75, color="black")+
+  scale_fill_gradient2(low = "red", mid="white", high = "darkgreen", na.value = NA) +
+  geom_text(aes(label=round(cor,1)),color="black",size=3,position=position_stack(vjust=0.5)) +
+  labs(y="Pairs",
+       x="Correlation coefficient")+
+  scale_x_continuous(limits = c(-1, 1, breaks = seq(-1, 1, by = 0.5)))+
+  theme_few()+
+  theme(legend.position="none")
+
+dev.off()
 ```
 
 
