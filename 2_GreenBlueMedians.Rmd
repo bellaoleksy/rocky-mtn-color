@@ -1,7 +1,7 @@
 ---
 title: "2009-2020 lake colors and controls"
-author: "Matthew Ross"
-date: "01/12/2022"
+author: "Bella Oleksy, Matthew Ross"
+date: "Last updated 2022-12-14"
 output: html_document
 editor_options: 
   chunk_output_type: console
