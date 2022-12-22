@@ -97,7 +97,7 @@ co_summary <- ls_co %>%
                names_sep = '-') %>%
   group_by(Hylak_id, var, stat) %>%
   arrange(year) %>%
-  mutate(impute_value = na_interpolation(value, maxgap = 1))
+  mutate(impute_value = imputeTS::na_interpolation(value, maxgap = 1))
 
 
 filled_enough <- co_summary %>%
